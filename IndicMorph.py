@@ -408,6 +408,7 @@ class IndicateursMorpho:
             indexIRIS = self.dlg.iris.currentIndex()
             layer_bati = self.dlg.couche.itemData(indexCouche)
             layer_routes = self.dlg.routes.itemData(indexRoutes)
+            features_road = {RFeature.id(): RFeature for RFeature in layer_routes.getFeatures()}
             layer_vegetation = self.dlg.vegetation.itemData(indexVegetation)
             layer_IRIS = self.dlg.iris.itemData(indexIRIS)
 
@@ -441,7 +442,14 @@ class IndicateursMorpho:
                 QgsField("IRIS",QVariant.Double),
                 QgsField("distToRoad",QVariant.Double),
                 QgsField("complexity",QVariant.Double),
-                QgsField("formFactor", QVariant.Double)]
+                QgsField("formFactor", QVariant.Double),
+                QgsField("nearRoad",QVariant.String)]
+
+            #create spatial index
+
+            SIndex_routes = QgsSpatialIndex()
+            for feat_route in layer_routes.getFeatures():
+                SIndex_routes.insertFeature(feat_route)
             
             # add the new measures to the features
             pr.addAttributes( fields )
@@ -482,7 +490,33 @@ class IndicateursMorpho:
 
                 #calcul des indicateurs a l'echelle du batiment
 
-                #risque d'etre long
+
+                roadList = []
+                dist = 0
+                while roadList == [] and dist < 20000:
+                    dist += 300
+                    zone = geom.buffer(dist,10).boundingBox()
+                    roadList = SIndex_routes.intersects(zone)
+                distToRoadMin = -1
+                for f_road_id in roadList:
+                    f_road = features_road[f_road_id]
+                    distToRoad = f_road.geometry().distance(geom)
+                    if distToRoadMin == -1:
+                        distToRoadMin = distToRoad
+                        nRoad = f_road.attribute("ID")
+                    elif(distToRoad<distToRoadMin):
+                        distToRoadMin = distToRoad
+                        nRoad = f_road.attribute("ID")
+                
+                """
+                nearestRoad = SIndex_routes.nearestNeighbor(geom.centroid().asPoint(),1)
+                for road in layer_routes.getFeatures():
+                    if road.id() == nearestRoad[0]:
+                        nRoad = road
+                distToRoadMin = nRoad.geometry().distance(geom)
+                """
+
+                """
                 distToRoadMin = -1
                 for f_road in layer_routes.getFeatures():
                     distToRoad = f_road.geometry().distance(geom)
@@ -490,6 +524,7 @@ class IndicateursMorpho:
                         distToRoadMin = distToRoad
                     else:
                         distToRoadMin = min(distToRoad,distToRoadMin)
+                """
                         
                 param_SMBR = self.compute_SMBR(geom)
                 SMBR_geom = param_SMBR[0]
@@ -533,6 +568,7 @@ class IndicateursMorpho:
                     feat.setAttribute( 12, distToRoadMin)
                 feat.setAttribute( 13, complexity)
                 feat.setAttribute( 14, formFactor)
+                feat.setAttribute(15, nRoad)
                 featureList.append(feat)
                 i += 1
                 progress.setValue(i)
