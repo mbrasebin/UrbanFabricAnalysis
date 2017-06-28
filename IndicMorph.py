@@ -20,17 +20,17 @@
  *                                                                         *
  ***************************************************************************/
 """
-from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant, Qt
-from PyQt4.QtGui import QAction, QIcon, QProgressBar, QMessageBox, QTransform
+from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant, Qt
+from PyQt5.QtGui import QIcon, QTransform
+from PyQt5.QtWidgets import QAction, QProgressBar, QMessageBox
 # Initialize Qt resources from file resources.py
-import resources
+from .resources import *
 # Import the code for the dialog
-from IndicMorph_dialog import IndicateursMorphoDialog
+from .IndicMorph_dialog import IndicateursMorphoDialog
 import os.path
-import math
-from qgis.core import QgsVectorLayer, QgsFeature, QgsSpatialIndex, QgsVectorFileWriter, QgsMapLayerRegistry
+from qgis.core import QgsVectorLayer, QgsFeature, QgsSpatialIndex, QgsVectorFileWriter, QgsProject
 from qgis.core import QgsFeatureRequest, QgsField, QgsGeometry, QgsPoint, QgsRectangle
-
+from .morpho import *
 
 
 class IndicateursMorpho:
@@ -181,186 +181,7 @@ class IndicateursMorpho:
                 action)
             self.iface.removeToolBarIcon(action)
         # remove the toolbar
-        del self.toolbar
-
-
-    """
-    Méthode de calcul du SMBR.
-    """
-
-    def normalizedAngle(self,  angle):
-        clippedAngle = angle
-        if ( clippedAngle >= math.pi * 2 or clippedAngle <= -2 * math.pi ):
-            clippedAngle = math.fmod( clippedAngle, 2 * math.pi)
-        if ( clippedAngle < 0.0 ):
-            clippedAngle += 2 * math.pi
-        return clippedAngle
-
-    def lineAngle(self, x1, y1, x2, y2):
-        at = math.atan2( y2 - y1, x2 - x1 )
-        a = -at + math.pi / 2.0
-        return self.normalizedAngle( a )
-
-    def compute_SMBR(self, geom):
-        area = float("inf")
-        angle = 0
-        width = float("inf")
-        height =  float("inf")
-        
-        if (geom is None):
-            return  QgsGeometry()
- 
-        hull = geom.convexHull()
-        if ( hull.isEmpty() ):
-            return QgsGeometry()
-        x = hull.asPolygon()
-        vertexId = 0
-        pt0 = x[0][vertexId]
-        pt1 = pt0
-        prevAngle = 0.0
-        size = len(x[0])
-        for vertexId in range(0,  size-0):
-            pt2 = x[0][vertexId]
-            currentAngle = self.lineAngle( pt1.x(), pt1.y(), pt2.x(), pt2.y() )
-            rotateAngle = 180.0 / math.pi *  (currentAngle - prevAngle)
-            prevAngle = currentAngle
-            
-            t = QTransform.fromTranslate( pt0.x(), pt0.y() )
-            t.rotate(rotateAngle)
-            t.translate( -pt0.x(), -pt0.y() )
-            hull.transform(t)
-            
-            bounds = hull.boundingBox()
-            currentArea = bounds.width() * bounds.height()
-            if ( currentArea  < area ):
-                minRect = bounds
-                area = currentArea
-                angle = 180.0 / math.pi * currentAngle
-                width = bounds.width()
-                height = bounds.height()
-            pt2 = pt1
-        minBounds = QgsGeometry.fromRect( minRect )
-        minBounds.rotate( angle, QgsPoint( pt0.x(), pt0.y() ) )
-        if ( angle > 180.0 ):
-            angle = math.fmod( angle, 180.0 )
-        return minBounds, area, angle, width, height
-
-    def addListe(self, l, i, n):
-        if i == len(l):
-            return l + [n]
-        elif n < l[i] :
-            return l[0:i]+[n]+l[i:len(l)]
-        elif n > l[i] :
-            return self.addListe(l,i+1,n)
-        else:
-            return l
-
-    def findIndex(self,l,n):
-        i = 0
-        j = len(l)-1
-        while i <= j :
-            k = l[(i+j)/2]
-            if k == n:
-                return (i+j)/2
-            elif k > n:
-                j = (j+i)/2-1
-            else :
-                i = (j+i)/2+1
-        if i>j:
-            return 0
-
-    def findIRIS_areas(self,liste_IRIS,geom,layer_IRIS):
-        intersections = []
-        for iris in layer_IRIS.getFeatures():
-            if iris.geometry().intersects(geom):
-                intersections.append([iris.attribute("ID"),iris.geometry().intersection(geom).area()])
-        return intersections
-
-    def findIRIS(self,liste_IRIS,geom,layer_IRIS):
-        intersections = self.findIRIS_areas(liste_IRIS,geom,layer_IRIS)
-        iris_id = 0
-        aire_max = 0
-        for element in intersections:
-            if element[1]>aire_max:
-                iris_id = element[0]
-                aire_max = element[1]
-        return iris_id
-
-    def compute_elongation(self, d1, d2):
-        """
-        Calcul de l'élongation.
-        """
-        elongation = min(d1,d2)/max(d1,d2)
-        return elongation
-
-    def compute_compactness(self, area, perimeter):
-        """
-        Calcul de la compacité.
-        """
-        return 4 * math.pi * area / (perimeter * perimeter)
-    
-    def compute_convexity1(self, geom, area):
-        """
-        Calcul de la convexité selon l'enveloppe convexe.
-        """
-        convexhull = geom.convexHull()
-        convexity1 = area/convexhull.area()
-        return convexity1
-        
-    def compute_convexity2(self, area, SMBR_area):
-        """
-        Calcul de la convexité selon le SMBR.
-        """
-        convexity2 = area/SMBR_area	
-        return convexity2
-
-    def compute_formFactor(self, hauteur, SMBR_area):
-        """
-        Calcul du facteur de forme
-        """
-        formFactor = hauteur * 2 / SMBR_area
-        return formFactor
-
-    def moyenne(self, l):
-        if l == []:
-            return "-"
-        m = 0.0
-        for i in l:
-            m += i
-        m = m/len(l)
-        return m
-
-    def variance(self, l):
-        if l == []:
-            return "-"
-        m = self.moyenne(l)
-        s = 0.0
-        for i in l:
-            s += i*i
-        return s/len(l)-m*m
-
-    def ecart_type(self, l):
-        if l == []:
-            return "-"
-        return math.sqrt(self.variance(l))
-
-    def mediane(self,l):
-        if l == []:
-            return "-"
-        n = len(l)
-        t = sorted(l)
-        return t[n/2]
-
-    def deciles(self,l):
-        if l == []:
-            return "-"
-        n = len(l)
-        t = sorted(l)
-        dec = [0 for i in range(9)]
-        for i in range(1,10):
-            dec[i-1]=t[i*n/10]
-        return dec
-    
+        del self.toolbar    
 
     def run(self):
         """Run method that performs all the real work"""
@@ -371,7 +192,7 @@ class IndicateursMorpho:
         self.dlg.iris.clear()
 
         #set the couche combobox items
-        layers = QgsMapLayerRegistry.instance().mapLayers().values()
+        layers = QgsProject.instance().mapLayers().values()
         for layer in layers:
             self.dlg.couche.addItem(layer.name(),layer)
             self.dlg.routes.addItem(layer.name(),layer)
@@ -412,12 +233,10 @@ class IndicateursMorpho:
             layer_vegetation = self.dlg.vegetation.itemData(indexVegetation)
             layer_IRIS = self.dlg.iris.itemData(indexIRIS)
 
-            liste_IRIS = []
-            for f in layer_IRIS.getFeatures():
-                n=f.attribute("ID")
-                liste_IRIS = self.addListe(liste_IRIS,0,int(n))
-                
-
+            liste_IRIS = sorted([f.attribute("DCOMIRIS") for f in layer_IRIS.getFeatures()])
+#            for f in layer_IRIS.getFeatures():
+#                n=f.attribute("DCOMIRIS")
+#                liste_IRIS = addListe(liste_IRIS,0,int(n))
 
             # create layer
             vl = QgsVectorLayer("Polygon", layer_bati.name(), "memory")
@@ -483,10 +302,10 @@ class IndicateursMorpho:
                 ident = f.attribute("ID")
 
                 #recherche de l'IRIS du batiment
-                iris_id = self.findIRIS(liste_IRIS,geom,layer_IRIS)
+                iris_id = findIRIS(geom,layer_IRIS,"DCOMIRIS")
 
                 if iris_id != 0:
-                    index_iris = self.findIndex(liste_IRIS,int(iris_id))
+                    index_iris = findIndex(liste_IRIS,int(iris_id))
 
                 #calcul des indicateurs a l'echelle du batiment
 
@@ -526,18 +345,18 @@ class IndicateursMorpho:
                         distToRoadMin = min(distToRoad,distToRoadMin)
                 """
                         
-                param_SMBR = self.compute_SMBR(geom)
+                param_SMBR = compute_SMBR(geom)
                 SMBR_geom = param_SMBR[0]
                 SMBR_area = param_SMBR[1]
                 SMBR_angle = param_SMBR[2]
                 SMBR_width = param_SMBR[3]
                 SMBR_height = param_SMBR[4]
-                convexity1 = self.compute_convexity1(geom, area)
-                convexity2 = self.compute_convexity2(area, SMBR_area)
-                elongation = self.compute_elongation(SMBR_height, SMBR_width)
-                compactness = self.compute_compactness(area, perimeter)
+                convexity1 = compute_convexity1(geom, area)
+                convexity2 = compute_convexity2(area, SMBR_area)
+                elongation = compute_elongation(SMBR_height, SMBR_width)
+                compactness = compute_compactness(area, perimeter)
                 complexity = len(geom.asPolygon()[0])
-                formFactor = self.compute_formFactor(hauteur, SMBR_area)
+                formFactor = compute_formFactor(hauteur, SMBR_area)
                 #remplissage des listes pour les calculs a l'echelle de l'IRIS
                 if iris_id != 0:
                     elongations[index_iris][1] += [elongation]
@@ -579,9 +398,9 @@ class IndicateursMorpho:
             for fVeget in layer_vegetation.getFeatures():
                 geomV = fVeget.geometry()
                 areaV = geomV.area()
-                iris_areasV = self.findIRIS_areas(liste_IRIS,geomV,layer_IRIS)
+                iris_areasV = findIRIS_areas(geomV,layer_IRIS,"DCOMIRIS")
                 for element in iris_areasV:
-                    index_irisV = self.findIndex(liste_IRIS,int(element[0]))
+                    index_irisV = findIndex(liste_IRIS,int(element[0]))
                     dens_vegetale[index_irisV] += element[1]
 
             # create layer iris
@@ -633,7 +452,7 @@ class IndicateursMorpho:
                 geomI = featIRIS.geometry()
                 areaI = geomI.area()
                 ID = featIRIS.attribute("ID")
-                indexI = self.findIndex(liste_IRIS,int(ID))
+                indexI = findIndex(liste_IRIS,int(ID))
                 areasI = areas[indexI][1]
                 elongationsI = elongations[indexI][1]
                 area_perimetersI = area_perimeters[indexI][1]
@@ -647,17 +466,17 @@ class IndicateursMorpho:
                 if nb_batiments > 0:
                     print(ID)
                     print("Area")
-                    print(self.deciles(areasI))
+                    print(deciles(areasI))
                     print("Elongation")
-                    print(self.deciles(elongationsI))
+                    print(deciles(elongationsI))
                     print("Area / perimeter")
-                    print(self.deciles(area_perimetersI))
+                    print(deciles(area_perimetersI))
                     print("Distance to road")
-                    print(self.deciles(distToRoadsI))
+                    print(deciles(distToRoadsI))
                     print("Complexity")
-                    print(self.deciles(complexitiesI))
+                    print(deciles(complexitiesI))
                     print("Form factor")
-                    print(self.deciles(formFactorsI))
+                    print(deciles(formFactorsI))
 
             
                 feat = QgsFeature()
@@ -666,33 +485,33 @@ class IndicateursMorpho:
                 feat.setAttribute( 0, ID )
                 feat.setAttribute( 1, nb_batiments )
                 if nb_batiments > 0:
-                    feat.setAttribute( 2, self.mediane(areasI) )
-                    feat.setAttribute( 3, self.moyenne(areasI) )
-                    feat.setAttribute( 4, self.ecart_type(areasI) )
-                    #feat.setAttribute( 5, self.deciles(areasI) )
-                    feat.setAttribute( 6, self.mediane(elongationsI) )
-                    feat.setAttribute( 7, self.moyenne(elongationsI) )
-                    feat.setAttribute( 8, self.ecart_type(elongationsI))
-                    #feat.setAttribute( 9, self.deciles(elongationsI) )
-                    feat.setAttribute( 10, self.mediane(area_perimetersI))
-                    feat.setAttribute( 11, self.moyenne(area_perimetersI))
-                    feat.setAttribute( 12, self.ecart_type(area_perimetersI))
-                    #feat.setAttribute( 13, self.deciles(area_perimetersI))
+                    feat.setAttribute( 2, median(areasI) )
+                    feat.setAttribute( 3, mean(areasI) )
+                    feat.setAttribute( 4, standard_deviation(areasI) )
+                    #feat.setAttribute( 5, deciles(areasI) )
+                    feat.setAttribute( 6, median(elongationsI) )
+                    feat.setAttribute( 7, mean(elongationsI) )
+                    feat.setAttribute( 8, standard_deviation(elongationsI))
+                    #feat.setAttribute( 9, deciles(elongationsI) )
+                    feat.setAttribute( 10, median(area_perimetersI))
+                    feat.setAttribute( 11, mean(area_perimetersI))
+                    feat.setAttribute( 12, standard_deviation(area_perimetersI))
+                    #feat.setAttribute( 13, deciles(area_perimetersI))
                     feat.setAttribute( 14, sum_areas / areaI)
                     feat.setAttribute( 15, dens_batie[indexI]/areaI)
-                    feat.setAttribute( 16, self.mediane(distToRoadsI))
-                    feat.setAttribute( 17, self.moyenne(distToRoadsI))
-                    feat.setAttribute( 18, self.ecart_type(distToRoadsI))
-                    #feat.setAttribute( 19, self.deciles(distToRoadsI))
+                    feat.setAttribute( 16, median(distToRoadsI))
+                    feat.setAttribute( 17, mean(distToRoadsI))
+                    feat.setAttribute( 18, standard_deviation(distToRoadsI))
+                    #feat.setAttribute( 19, deciles(distToRoadsI))
                     feat.setAttribute( 20, dens_vegetaleI / areaI)
-                    feat.setAttribute( 21, self.mediane(complexitiesI))
-                    feat.setAttribute( 22, self.moyenne(complexitiesI))
-                    feat.setAttribute( 23, self.ecart_type(complexitiesI))
-                    #feat.setAttribute( 24, self.deciles(complexitiesI))
-                    feat.setAttribute( 25, self.mediane(formFactorsI))
-                    feat.setAttribute( 26, self.moyenne(formFactorsI))
-                    feat.setAttribute( 27, self.ecart_type(formFactorsI))
-                    #feat.setAttribute( 28, self.deciles(formFactorsI))
+                    feat.setAttribute( 21, median(complexitiesI))
+                    feat.setAttribute( 22, mean(complexitiesI))
+                    feat.setAttribute( 23, standard_deviation(complexitiesI))
+                    #feat.setAttribute( 24, deciles(complexitiesI))
+                    feat.setAttribute( 25, median(formFactorsI))
+                    feat.setAttribute( 26, mean(formFactorsI))
+                    feat.setAttribute( 27, standard_deviation(formFactorsI))
+                    #feat.setAttribute( 28, deciles(formFactorsI))
                     
 
                 featureListBis.append(feat)
@@ -723,15 +542,15 @@ class IndicateursMorpho:
                 res = []
                 for f in layer_bati.getFeatures():
                     geom = f.geometry()
-                    smbr = self.compute_SMBR(geom)
-                    res.append(self.compute_convexity2(geom.area(),smbr[1]))
+                    smbr = compute_SMBR(geom)
+                    res.append(compute_convexity2(geom.area(),smbr[1]))
                     i = i + 1
                     progress.setValue(i)
                 ind = "convexity depending on SMBR" """
                 
 
-            QgsMapLayerRegistry.instance().addMapLayer(vl)
-            QgsMapLayerRegistry.instance().addMapLayer(irisBis)
+            QgsProject.instance().addMapLayer(vl)
+            QgsProject.instance().addMapLayer(irisBis)
             #QMessageBox.information(self.iface.mainWindow(),ind,str(res))
 
             self.iface.messageBar().clearWidgets()
