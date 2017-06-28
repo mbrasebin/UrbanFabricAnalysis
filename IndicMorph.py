@@ -247,8 +247,9 @@ class IndicateursMorpho:
 
             # add fields
             fields = [
-                QgsField("ID", QVariant.Double),
+                QgsField("ID", QVariant.String),
                 QgsField("area", QVariant.Double),
+                QgsField("volume",QVariant.Double),
                 QgsField("SMBR_area", QVariant.Double),
                 QgsField("SMBR_angle", QVariant.Double),
                 QgsField("SMBR_width", QVariant.Double),
@@ -282,6 +283,7 @@ class IndicateursMorpho:
             self.iface.messageBar().pushWidget(progressMessageBar, self.iface.messageBar().INFO)
 
             areas = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
+            volumes = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
             elongations = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
             featureList = []
             featureListBis = []
@@ -355,13 +357,14 @@ class IndicateursMorpho:
                 convexity2 = compute_convexity2(area, SMBR_area)
                 elongation = compute_elongation(SMBR_height, SMBR_width)
                 compactness = compute_compactness(area, perimeter)
-                complexity = len(geom.asPolygon()[0])
+                complexity = len(geom.asPolygon()[0]) - 1
                 formFactor = compute_formFactor(hauteur, SMBR_area)
                 #remplissage des listes pour les calculs a l'echelle de l'IRIS
                 if iris_id != 0:
                     elongations[index_iris][1] += [elongation]
                     area_perimeters[index_iris][1] += [area/perimeter]
                     areas[index_iris][1] += [area]
+                    volumes[index_iris][1] += [area * hauteur]
                     dens_batie[index_iris] += area*(hauteur*5/2)
                     if distToRoadMin >= 0:
                         distToRoads[index_iris][1] += [distToRoadMin]
@@ -373,21 +376,22 @@ class IndicateursMorpho:
                 feat.initAttributes(len(fields))
                 feat.setAttribute( 0, ident)
                 feat.setAttribute( 1, area )
-                feat.setAttribute( 2, SMBR_area )
-                feat.setAttribute( 3, SMBR_angle )
-                feat.setAttribute( 4, SMBR_width )
-                feat.setAttribute( 5, SMBR_height )
-                feat.setAttribute( 6, convexity1 )
-                feat.setAttribute( 7, convexity2 )
-                feat.setAttribute( 8, elongation)
-                feat.setAttribute( 9, compactness )
-                feat.setAttribute( 10, area/perimeter)
-                feat.setAttribute( 11, iris_id)
+                feat.setAttribute( 2, area * hauteur)
+                feat.setAttribute( 3, SMBR_area )
+                feat.setAttribute( 4, SMBR_angle )
+                feat.setAttribute( 5, SMBR_width )
+                feat.setAttribute( 6, SMBR_height )
+                feat.setAttribute( 7, convexity1 )
+                feat.setAttribute( 8, convexity2 )
+                feat.setAttribute( 9, elongation)
+                feat.setAttribute( 10, compactness )
+                feat.setAttribute( 11, area/perimeter)
+                feat.setAttribute( 12, iris_id)
                 if distToRoadMin >= 0:
-                    feat.setAttribute( 12, distToRoadMin)
-                feat.setAttribute( 13, complexity)
-                feat.setAttribute( 14, formFactor)
-                feat.setAttribute(15, nRoad)
+                    feat.setAttribute( 13, distToRoadMin)
+                feat.setAttribute( 14, complexity)
+                feat.setAttribute( 15, formFactor)
+                feat.setAttribute(16, nRoad)
                 featureList.append(feat)
                 i += 1
                 progress.setValue(i)
@@ -418,6 +422,9 @@ class IndicateursMorpho:
                 QgsField("area_moy", QVariant.Double),
                 QgsField("area_ect", QVariant.Double),
                 QgsField("area_dec", QVariant.Double),
+                QgsField("volume_med",QVariant.Double),
+                QgsField("volume_moy",QVariant.Double),
+                QgsField("volume_ect",QVariant.Double),
                 QgsField("elong_med", QVariant.Double),
                 QgsField("elong_moy", QVariant.Double),
                 QgsField("elong_ect", QVariant.Double),
@@ -454,6 +461,7 @@ class IndicateursMorpho:
                 ID = featIRIS.attribute("ID")
                 indexI = findIndex(liste_IRIS,int(ID))
                 areasI = areas[indexI][1]
+                volumesI = volumes[indexI][1]
                 elongationsI = elongations[indexI][1]
                 area_perimetersI = area_perimeters[indexI][1]
                 nb_batiments = len(areas[indexI][1])
@@ -467,6 +475,8 @@ class IndicateursMorpho:
                     print(ID)
                     print("Area")
                     print(deciles(areasI))
+                    print("Volume")
+                    print(deciles(volumesI))
                     print("Elongation")
                     print(deciles(elongationsI))
                     print("Area / perimeter")
@@ -489,38 +499,37 @@ class IndicateursMorpho:
                     feat.setAttribute( 3, mean(areasI) )
                     feat.setAttribute( 4, standard_deviation(areasI) )
                     #feat.setAttribute( 5, deciles(areasI) )
-                    feat.setAttribute( 6, median(elongationsI) )
-                    feat.setAttribute( 7, mean(elongationsI) )
-                    feat.setAttribute( 8, standard_deviation(elongationsI))
-                    #feat.setAttribute( 9, deciles(elongationsI) )
-                    feat.setAttribute( 10, median(area_perimetersI))
-                    feat.setAttribute( 11, mean(area_perimetersI))
-                    feat.setAttribute( 12, standard_deviation(area_perimetersI))
-                    #feat.setAttribute( 13, deciles(area_perimetersI))
-                    feat.setAttribute( 14, sum_areas / areaI)
-                    feat.setAttribute( 15, dens_batie[indexI]/areaI)
-                    feat.setAttribute( 16, median(distToRoadsI))
-                    feat.setAttribute( 17, mean(distToRoadsI))
-                    feat.setAttribute( 18, standard_deviation(distToRoadsI))
-                    #feat.setAttribute( 19, deciles(distToRoadsI))
-                    feat.setAttribute( 20, dens_vegetaleI / areaI)
-                    feat.setAttribute( 21, median(complexitiesI))
-                    feat.setAttribute( 22, mean(complexitiesI))
-                    feat.setAttribute( 23, standard_deviation(complexitiesI))
-                    #feat.setAttribute( 24, deciles(complexitiesI))
-                    feat.setAttribute( 25, median(formFactorsI))
-                    feat.setAttribute( 26, mean(formFactorsI))
-                    feat.setAttribute( 27, standard_deviation(formFactorsI))
-                    #feat.setAttribute( 28, deciles(formFactorsI))
-                    
+                    feat.setAttribute( 6, median(volumesI))
+                    feat.setAttribute( 7, mean(volumesI))
+                    feat.setAttribute( 8, standard_deviation(volumesI))
+                    feat.setAttribute( 9, median(elongationsI) )
+                    feat.setAttribute( 10, mean(elongationsI) )
+                    feat.setAttribute( 11, standard_deviation(elongationsI))
+                    #feat.setAttribute( 12, deciles(elongationsI) )
+                    feat.setAttribute( 13, median(area_perimetersI))
+                    feat.setAttribute( 14, mean(area_perimetersI))
+                    feat.setAttribute( 15, standard_deviation(area_perimetersI))
+                    #feat.setAttribute( 16, deciles(area_perimetersI))
+                    feat.setAttribute( 17, sum_areas / areaI)
+                    feat.setAttribute( 18, dens_batie[indexI]/areaI)
+                    feat.setAttribute( 19, median(distToRoadsI))
+                    feat.setAttribute( 20, mean(distToRoadsI))
+                    feat.setAttribute( 21, standard_deviation(distToRoadsI))
+                    #feat.setAttribute( 22, deciles(distToRoadsI))
+                    feat.setAttribute( 23, dens_vegetaleI / areaI)
+                    feat.setAttribute( 24, median(complexitiesI))
+                    feat.setAttribute( 25, mean(complexitiesI))
+                    feat.setAttribute( 26, standard_deviation(complexitiesI))
+                    #feat.setAttribute( 27, deciles(complexitiesI))
+                    feat.setAttribute( 28, median(formFactorsI))
+                    feat.setAttribute( 29, mean(formFactorsI))
+                    feat.setAttribute( 30, standard_deviation(formFactorsI))
+                    #feat.setAttribute( 31, deciles(formFactorsI))
 
-                featureListBis.append(feat)
-
-            
+                featureListBis.append(feat)            
 
             prBis.addFeatures( featureListBis ) 
             irisBis.commitChanges()
-
 
             #Calcul de l'indicateur demande uniquement
             
