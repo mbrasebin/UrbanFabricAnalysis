@@ -56,7 +56,6 @@ for f in layer_aggregation.getFeatures(): aggregation_index.insertFeature(f)
 
 # Create dictionaries of all features
 aggregation_dict = {f.id(): f for f in layer_aggregation.getFeatures()}
-#aggregation_building_dict = {f.attribute(aggregation_id_name): [] for f in layer_aggregation.getFeatures()}
 road_dict = {f.id(): f for f in layer_roads.getFeatures()}
 area_dict = {f.attribute(aggregation_id_name): [] for f in layer_aggregation.getFeatures()}
 elongation_dict = {f.attribute(aggregation_id_name): [] for f in layer_aggregation.getFeatures()}
