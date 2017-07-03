@@ -57,46 +57,32 @@ def compute_SMBR(geom):
         angle = math.fmod( angle, 180.0 )
     return minBounds, area, angle, width, height
 
-def addListe(l, i, n):
-    if i == len(l):
-        return l + [n]
-    elif n < l[i] :
-        return l[0:i]+[n]+l[i:len(l)]
-    elif n > l[i] :
-        return addListe(l, i+1, n)
-    else:
-        return l
+def m(c,i,g):
+    attr = c.attribute(i)
+    area = c.geometry().intersection(g).area()
+    return (attr,area)
 
-def findIndex(l, n):
-    i = 0
-    j = len(l)-1
-    while i <= j :
-        k = int(l[int((i+j)/2)])
-        if k == n:
-            return int((i+j)/2)
-        elif k > n:
-            j = int((j+i)/2-1)
-        else :
-            i = int((j+i)/2+1)
-    if i > j:
-        return 0
+def find_areas(geom, index, dictionary, idAttribute):
+    return [m(candidate, idAttribute, geom)
+            for candidate in
+            map(lambda id:dictionary[id], index.intersects(geom.boundingBox()))
+            if candidate.geometry().intersects(geom)]
 
-def findIRIS_areas(geom, layer_IRIS, idAttribute):
-    intersections = []
-    for iris in layer_IRIS.getFeatures():
-        if iris.geometry().intersects(geom):
-            intersections.append([iris.attribute(idAttribute),iris.geometry().intersection(geom).area()])
-    return intersections
+def find(geom, index, dictionary, idAttribute):
+    intersections = find_areas(geom, index, dictionary, idAttribute)
+    return max(intersections, key=lambda x: x[1])[0]
 
-def findIRIS(geom, layer_IRIS, idAttribute):
-    intersections = findIRIS_areas(geom, layer_IRIS, idAttribute)
-    iris_id = 0
-    aire_max = 0
-    for element in intersections:
-        if element[1] > aire_max:
-            iris_id = element[0]
-            aire_max = element[1]
-    return iris_id
+def distance_from_polygon_to_layer(geom, index, dictionary, layer_id):
+    point = geom.pointOnSurface().asPoint()
+    distance = dictionary[index.nearestNeighbor(point,1)[0]].geometry().distance(geom)
+    #    print(point.wellKnownText())
+    #    print(distance)
+    bbox = geom.buffer(distance+1,3).boundingBox()
+    #    print(bbox.asWktPolygon())
+    return min(
+        ((f.geometry().distance(geom), f.attribute(layer_id))
+         for f in map(lambda id: dictionary[id], index.intersects(bbox))),
+        key=lambda x: x[0])
 
 def compute_elongation(d1, d2):
     """
@@ -154,14 +140,18 @@ def variance(l):
 def standard_deviation(l):
     if l == []:
         return "-"
-    return math.sqrt(variance(l))
+    var = variance(l)
+    if var > 0: return math.sqrt(var)
+    return 0
 
 def median(l):
-    if l == []:
-        return "-"
+    if l == []: return "-"
     n = len(l)
+    if (n==1): return l[0]
     t = sorted(l)
-    return t[n/2]
+    m = int(n/2)
+    if (n%2==0): return t[m]
+    return (t[m] + t[m+1])/2
 
 def deciles(l):
     if l == []:
