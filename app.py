@@ -42,6 +42,7 @@ fields.append(QgsField("distToRoad",QVariant.Double))
 fields.append(QgsField("complexity",QVariant.Double))
 fields.append(QgsField("formFactor", QVariant.Double))
 fields.append(QgsField("nearRoad",QVariant.String))
+fields.append(QgsField("SMBR_angle_90", QVariant.Double))
 
 buildings_writer = QgsVectorFileWriter("/home/julien/tmp/buildings_out.shp", "utf-8", fields,
                              QgsWkbTypes.Polygon, layer_buildings.sourceCrs(),
@@ -126,6 +127,7 @@ for elem in layer_buildings.getFeatures():
     feat.setAttribute( 14, complexity)
     feat.setAttribute( 15, formFactor)
     feat.setAttribute( 16, road)
+    feat.setAttribute( 17, ombb_angle % 90)
     #featureList.append(feat)
     buildings_writer.addFeature(feat)
     i = i+1

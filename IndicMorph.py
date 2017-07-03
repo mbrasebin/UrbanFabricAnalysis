@@ -263,7 +263,8 @@ class IndicateursMorpho:
                 QgsField("distToRoad",QVariant.Double),
                 QgsField("complexity",QVariant.Double),
                 QgsField("formFactor", QVariant.Double),
-                QgsField("nearRoad",QVariant.String)]
+                QgsField("nearRoad",QVariant.String),
+                QgsField("SMBR_angle_90", QVariant.Double)]
 
             #create spatial indexes
             index_routes = QgsSpatialIndex()
@@ -353,7 +354,8 @@ class IndicateursMorpho:
                     feat.setAttribute( 13, distToRoadMin)
                 feat.setAttribute( 14, complexity)
                 feat.setAttribute( 15, formFactor)
-                feat.setAttribute(16, nRoad)
+                feat.setAttribute( 16, nRoad)
+                feat.setAttribute( 17, SMBR_angle%90)
                 featureList.append(feat)
                 i += 1
                 progress.setValue(i)
