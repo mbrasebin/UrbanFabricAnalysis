@@ -31,7 +31,7 @@ import os.path
 from qgis.core import QgsVectorLayer, QgsFeature, QgsSpatialIndex, QgsVectorFileWriter, QgsProject
 from qgis.core import QgsFeatureRequest, QgsField, QgsGeometry, QgsPoint, QgsRectangle
 from .morpho import *
-
+from statistics import *
 
 class IndicateursMorpho:
     """QGIS Plugin Implementation."""
@@ -382,33 +382,33 @@ class IndicateursMorpho:
                 QgsField("area_med", QVariant.Double),
                 QgsField("area_moy", QVariant.Double),
                 QgsField("area_ect", QVariant.Double),
-                QgsField("area_dec", QVariant.Double),
+                QgsField("area_dec", QVariant.String),
                 QgsField("volume_med",QVariant.Double),
                 QgsField("volume_moy",QVariant.Double),
                 QgsField("volume_ect",QVariant.Double),
                 QgsField("elong_med", QVariant.Double),
                 QgsField("elong_moy", QVariant.Double),
                 QgsField("elong_ect", QVariant.Double),
-                QgsField("elong_dec", QVariant.Double),
+                QgsField("elong_dec", QVariant.String),
                 QgsField("areaper_med", QVariant.Double),
                 QgsField("areaper_moy", QVariant.Double),
                 QgsField("areaper_ect", QVariant.Double),
-                QgsField("areaper_dec", QVariant.Double),
+                QgsField("areaper_dec", QVariant.String),
                 QgsField("ces",QVariant.Double),
                 QgsField("dens_batie", QVariant.Double),
                 QgsField("dsRoad_med",QVariant.Double),
                 QgsField("dsRoad_moy",QVariant.Double),
                 QgsField("dsRoad_ect",QVariant.Double),
-                QgsField("dsRoad_dec",QVariant.Double),
+                QgsField("dsRoad_dec",QVariant.String),
                 QgsField("dens_veget",QVariant.Double),
                 QgsField("compl_med",QVariant.Double),
                 QgsField("compl_moy",QVariant.Double),
                 QgsField("compl_ect",QVariant.Double),
-                QgsField("compl_dec",QVariant.Double),
+                QgsField("compl_dec",QVariant.String),
                 QgsField("formF_med",QVariant.Double),
                 QgsField("formF_moy",QVariant.Double),
                 QgsField("formF_ect",QVariant.Double),
-                QgsField("formF_dec",QVariant.Double)
+                QgsField("formF_dec",QVariant.String)
                 ]
             
             # add the new measures to the features
@@ -458,33 +458,33 @@ class IndicateursMorpho:
                     feat.setAttribute( 2, median(areasI) )
                     feat.setAttribute( 3, mean(areasI) )
                     feat.setAttribute( 4, standard_deviation(areasI) )
-                    #feat.setAttribute( 5, deciles(areasI) )
+                    feat.setAttribute( 5, deciles_as_str(areasI))
                     feat.setAttribute( 6, median(volumesI))
                     feat.setAttribute( 7, mean(volumesI))
                     feat.setAttribute( 8, standard_deviation(volumesI))
                     feat.setAttribute( 9, median(elongationsI) )
                     feat.setAttribute( 10, mean(elongationsI) )
                     feat.setAttribute( 11, standard_deviation(elongationsI))
-                    #feat.setAttribute( 12, deciles(elongationsI) )
+                    feat.setAttribute( 12, deciles_as_str(elongationsI))
                     feat.setAttribute( 13, median(area_perimetersI))
                     feat.setAttribute( 14, mean(area_perimetersI))
                     feat.setAttribute( 15, standard_deviation(area_perimetersI))
-                    #feat.setAttribute( 16, deciles(area_perimetersI))
+                    feat.setAttribute( 16, deciles_as_str(area_perimetersI))
                     feat.setAttribute( 17, sum_areas / areaI)
                     feat.setAttribute( 18, sum(densityI)/areaI)
                     feat.setAttribute( 19, median(distToRoadsI))
                     feat.setAttribute( 20, mean(distToRoadsI))
                     feat.setAttribute( 21, standard_deviation(distToRoadsI))
-                    #feat.setAttribute( 22, deciles(distToRoadsI))
+                    feat.setAttribute( 22, deciles_as_str(distToRoadsI))
                     feat.setAttribute( 23, sum(dens_vegetaleI) / areaI)
                     feat.setAttribute( 24, median(complexitiesI))
                     feat.setAttribute( 25, mean(complexitiesI))
                     feat.setAttribute( 26, standard_deviation(complexitiesI))
-                    #feat.setAttribute( 27, deciles(complexitiesI))
+                    feat.setAttribute( 27, deciles_as_str(complexitiesI))
                     feat.setAttribute( 28, median(formFactorsI))
                     feat.setAttribute( 29, mean(formFactorsI))
                     feat.setAttribute( 30, standard_deviation(formFactorsI))
-                    #feat.setAttribute( 31, deciles(formFactorsI))
+                    feat.setAttribute( 31, deciles_as_str(formFactorsI))
 
                 featureListBis.append(feat)            
 

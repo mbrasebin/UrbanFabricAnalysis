@@ -1,6 +1,8 @@
 from PyQt5.QtGui import QTransform
 from qgis.core import QgsField, QgsGeometry, QgsPointXY, QgsRectangle
 import math
+import numpy
+from statistics import *
 """
 SMBR computation.
 """
@@ -119,46 +121,10 @@ def compute_formFactor(hauteur, SMBR_area):
     formFactor = hauteur * 2 / SMBR_area
     return formFactor
 
-def mean(l):
-    if l == []:
-        return "-"
-    m = 0.0
-    for i in l:
-        m += i
-    m = m/len(l)
-    return m
-
-def variance(l):
-    if l == []:
-        return "-"
-    m = median(l)
-    s = 0.0
-    for i in l:
-        s += i*i
-    return s/len(l)-m*m
-
 def standard_deviation(l):
-    if l == []:
-        return "-"
-    var = variance(l)
-    if var > 0: return math.sqrt(var)
+    if len(l) > 1: return stdev(l)
     return 0
 
-def median(l):
-    if l == []: return "-"
-    n = len(l)
-    if (n==1): return l[0]
-    t = sorted(l)
-    m = int(n/2)
-    if (n%2==0): return t[m]
-    return (t[m] + t[m+1])/2
+def deciles(l): return numpy.percentile(l, numpy.arange(0, 100, 10))
 
-def deciles(l):
-    if l == []:
-        return "-"
-    n = len(l)
-    t = sorted(l)
-    dec = [0 for i in range(9)]
-    for i in range(1,10):
-        dec[i-1]=t[i*n/10]
-    return dec
+def deciles_as_str(l): return numpy.array2string(deciles(l), precision=2, separator=',',suppress_small=True)

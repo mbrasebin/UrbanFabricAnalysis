@@ -1,6 +1,7 @@
 from qgis.core import *
 from PyQt5.QtCore import QVariant
 from morpho import *
+from statistics import *
 
 # supply path to qgis install location
 QgsApplication.setPrefixPath("/usr", True)
@@ -193,33 +194,33 @@ for featIRIS in layer_aggregation.getFeatures():
         feat.setAttribute( 2, median(areasI) )
         feat.setAttribute( 3, mean(areasI) )
         feat.setAttribute( 4, standard_deviation(areasI) )
-        #feat.setAttribute( 5, deciles(areasI) )
+        feat.setAttribute( 5, deciles_as_str(areasI) )
         feat.setAttribute( 6, median(volumesI))
         feat.setAttribute( 7, mean(volumesI))
         feat.setAttribute( 8, standard_deviation(volumesI))
         feat.setAttribute( 9, median(elongationsI) )
         feat.setAttribute( 10, mean(elongationsI) )
         feat.setAttribute( 11, standard_deviation(elongationsI))
-        #feat.setAttribute( 12, deciles(elongationsI) )
+        feat.setAttribute( 12, deciles_as_str(elongationsI) )
         feat.setAttribute( 13, median(area_perimetersI))
         feat.setAttribute( 14, mean(area_perimetersI))
         feat.setAttribute( 15, standard_deviation(area_perimetersI))
-        #feat.setAttribute( 16, deciles(area_perimetersI))
+        feat.setAttribute( 16, deciles_as_str(area_perimetersI))
         feat.setAttribute( 17, sum_areas / areaI)
         feat.setAttribute( 18, sum(densityI)/areaI)
         feat.setAttribute( 19, median(distToRoadsI))
         feat.setAttribute( 20, mean(distToRoadsI))
         feat.setAttribute( 21, standard_deviation(distToRoadsI))
-        #feat.setAttribute( 22, deciles(distToRoadsI))
+        feat.setAttribute( 22, deciles_as_str(distToRoadsI))
         feat.setAttribute( 23, sum(dens_vegetaleI) / areaI)
         feat.setAttribute( 24, median(complexitiesI))
         feat.setAttribute( 25, mean(complexitiesI))
         feat.setAttribute( 26, standard_deviation(complexitiesI))
-        #feat.setAttribute( 27, deciles(complexitiesI))
+        feat.setAttribute( 27, deciles_as_str(complexitiesI))
         feat.setAttribute( 28, median(formFactorsI))
         feat.setAttribute( 29, mean(formFactorsI))
         feat.setAttribute( 30, standard_deviation(formFactorsI))
-        #feat.setAttribute( 31, deciles(formFactorsI))
+        feat.setAttribute( 31, deciles_as_str(formFactorsI))
     aggregation_writer.addFeature(feat)
 
 del aggregation_writer
