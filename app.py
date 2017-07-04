@@ -1,7 +1,13 @@
+import sys
+import os
 from qgis.core import *
 from PyQt5.QtCore import QVariant
 from morpho import *
 from statistics import *
+
+input_dir = sys.argv[1]
+output_dir = sys.argv[2]
+os.makedirs(output_dir)
 
 # supply path to qgis install location
 QgsApplication.setPrefixPath("/usr", True)
@@ -13,10 +19,10 @@ qgs = QgsApplication([], False)
 qgs.initQgis()
 
 # Write your code here to load some layers, use processing algorithms, etc.
-layer_buildings = QgsVectorLayer('/home/julien/tmp/buildings.shp', 'layer_buildings', 'ogr')
-layer_roads = QgsVectorLayer('/home/julien/tmp/roads.shp', 'layer_roads', 'ogr')
-layer_vegetation = QgsVectorLayer('/home/julien/tmp/vegetation.shp', 'layer', 'ogr')
-layer_aggregation = QgsVectorLayer('/home/julien/tmp/aggregation.shp', 'layer_aggregation', 'ogr')
+layer_buildings = QgsVectorLayer(input_dir+'/buildings.shp', 'layer_buildings', 'ogr')
+layer_roads = QgsVectorLayer(input_dir+'/roads.shp', 'layer_roads', 'ogr')
+layer_vegetation = QgsVectorLayer(input_dir+'/vegetation.shp', 'layer', 'ogr')
+layer_aggregation = QgsVectorLayer(input_dir+'/aggregation.shp', 'layer_aggregation', 'ogr')
 
 building_height_name = "HAUTEUR"
 building_id_name = "ID"
@@ -44,7 +50,7 @@ fields.append(QgsField("formFactor", QVariant.Double))
 fields.append(QgsField("nearRoad",QVariant.String))
 fields.append(QgsField("SMBR_angle_90", QVariant.Double))
 
-buildings_writer = QgsVectorFileWriter("/home/julien/tmp/buildings_out.shp", "utf-8", fields,
+buildings_writer = QgsVectorFileWriter(output_dir+"/buildings_out.shp", "utf-8", fields,
                              QgsWkbTypes.Polygon, layer_buildings.sourceCrs(),
                              "ESRI Shapefile")
 
@@ -141,35 +147,35 @@ aggregation_fields.append(QgsField("nb_batis", QVariant.Double))
 aggregation_fields.append(QgsField("area_med", QVariant.Double))
 aggregation_fields.append(QgsField("area_moy", QVariant.Double))
 aggregation_fields.append(QgsField("area_ect", QVariant.Double))
-aggregation_fields.append(QgsField("area_dec", QVariant.Double))
+aggregation_fields.append(QgsField("area_dec", QVariant.String))
 aggregation_fields.append(QgsField("volume_med",QVariant.Double))
 aggregation_fields.append(QgsField("volume_moy",QVariant.Double))
 aggregation_fields.append(QgsField("volume_ect",QVariant.Double))
 aggregation_fields.append(QgsField("elong_med", QVariant.Double))
 aggregation_fields.append(QgsField("elong_moy", QVariant.Double))
 aggregation_fields.append(QgsField("elong_ect", QVariant.Double))
-aggregation_fields.append(QgsField("elong_dec", QVariant.Double))
+aggregation_fields.append(QgsField("elong_dec", QVariant.String))
 aggregation_fields.append(QgsField("areaper_med", QVariant.Double))
 aggregation_fields.append(QgsField("areaper_moy", QVariant.Double))
 aggregation_fields.append(QgsField("areaper_ect", QVariant.Double))
-aggregation_fields.append(QgsField("areaper_dec", QVariant.Double))
+aggregation_fields.append(QgsField("areaper_dec", QVariant.String))
 aggregation_fields.append(QgsField("ces",QVariant.Double))
 aggregation_fields.append(QgsField("dens_batie", QVariant.Double))
 aggregation_fields.append(QgsField("dsRoad_med",QVariant.Double))
 aggregation_fields.append(QgsField("dsRoad_moy",QVariant.Double))
 aggregation_fields.append(QgsField("dsRoad_ect",QVariant.Double))
-aggregation_fields.append(QgsField("dsRoad_dec",QVariant.Double))
+aggregation_fields.append(QgsField("dsRoad_dec",QVariant.String))
 aggregation_fields.append(QgsField("dens_veget",QVariant.Double))
 aggregation_fields.append(QgsField("compl_med",QVariant.Double))
 aggregation_fields.append(QgsField("compl_moy",QVariant.Double))
 aggregation_fields.append(QgsField("compl_ect",QVariant.Double))
-aggregation_fields.append(QgsField("compl_dec",QVariant.Double))
+aggregation_fields.append(QgsField("compl_dec",QVariant.String))
 aggregation_fields.append(QgsField("formF_med",QVariant.Double))
 aggregation_fields.append(QgsField("formF_moy",QVariant.Double))
 aggregation_fields.append(QgsField("formF_ect",QVariant.Double))
-aggregation_fields.append(QgsField("formF_dec",QVariant.Double))
+aggregation_fields.append(QgsField("formF_dec",QVariant.String))
 
-aggregation_writer = QgsVectorFileWriter("/home/julien/tmp/aggregation_out.shp", "utf-8", aggregation_fields, QgsWkbTypes.Polygon, layer_aggregation.sourceCrs(), "ESRI Shapefile")
+aggregation_writer = QgsVectorFileWriter(output_dir+"/aggregation_out.shp", "utf-8", aggregation_fields, QgsWkbTypes.Polygon, layer_aggregation.sourceCrs(), "ESRI Shapefile")
 
 for featIRIS in layer_aggregation.getFeatures():
     geomI = featIRIS.geometry()
