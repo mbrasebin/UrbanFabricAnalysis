@@ -1,28 +1,24 @@
-// Declare the variable
 val input = Val[File]
 val output = Val[File]
 val dataDirs  = Val[Array[File]]
-val value = Val[Int]
-val display = Val[String]
+val inputName = Val[String]
+
+// the directory from which the care archive was built
+val myWorkDirectory = "/home/julien/devel/UrbanFabricAnalysis"
 
 // python task
 val pythonTask =
-  CARETask(workDirectory / "myapp.tgz.bin", "xvfb-run python3 /home/julien/devel/UrbanFabricAnalysis/app.py data result") set (
-    inputs += input,
-    inputFiles += (input, "/home/julien/myapp/data"),
-    outputFiles += ("result", output),
-    outputs += input,
-    value := 1,
-    display := ":0",
-    environmentVariable += (value, "PROOT_NO_SECCOMP"),
-    environmentVariable += (display, "DISPLAY")
+  CARETask(workDirectory / "myapp.tgz.bin", "xvfb-run python3 app.py data result") set (
+    (inputs,outputs) += (input, inputName),
+    inputFiles += (input, s"${myWorkDirectory}/data"),
+    outputFiles += ("result", output)
   )
 
-val exploration = ExplorationTask(input in dataDirs)
+val exploration = ExplorationTask(input in dataDirs withName inputName)
 
 // will fill dataDirs with all the subdirectories of "directory" starting with data
 val s = ListDirectoriesSource(workDirectory, dataDirs, "^data.*")
   
-val copy = CopyFileHook(output, workDirectory / "results")
+val copy = CopyFileHook(output, workDirectory / "results" / "${inputName}")
 val env = LocalEnvironment(4)
 (exploration source s) -< (pythonTask hook copy on env)
