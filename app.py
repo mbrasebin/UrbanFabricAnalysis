@@ -7,7 +7,6 @@ from statistics import *
 
 input_dir = sys.argv[1]
 output_dir = sys.argv[2]
-os.makedirs(output_dir)
 
 # supply path to qgis install location
 QgsApplication.setPrefixPath("/usr", True)
@@ -17,17 +16,38 @@ qgs = QgsApplication([], False)
 
 # load providers
 qgs.initQgis()
+print(qgs.showSettings())
 
 # Write your code here to load some layers, use processing algorithms, etc.
-layer_buildings = QgsVectorLayer(input_dir+'/buildings.shp', 'layer_buildings', 'ogr')
-layer_roads = QgsVectorLayer(input_dir+'/roads.shp', 'layer_roads', 'ogr')
-layer_vegetation = QgsVectorLayer(input_dir+'/vegetation.shp', 'layer', 'ogr')
-layer_aggregation = QgsVectorLayer(input_dir+'/aggregation.shp', 'layer_aggregation', 'ogr')
+layer_buildings = QgsVectorLayer(os.path.join(input_dir,'buildings.shp'), 'buildings', 'ogr')
+layer_roads = QgsVectorLayer(os.path.join(input_dir,'roads.shp'), 'roads', 'ogr')
+layer_vegetation = QgsVectorLayer(os.path.join(input_dir,'vegetation.shp'), 'vegetation', 'ogr')
+layer_aggregation = QgsVectorLayer(os.path.join(input_dir,'aggregation.shp'), 'aggregation', 'ogr')
 
+# Check everything was loaded properly
+if not (layer_buildings.isValid() and layer_roads.isValid() and layer_vegetation.isValid() and layer_aggregation.isValid()):
+    print("Error while loading layers")
+    print("Full path to the current working directory: " + os.getcwd())
+    print("Full path to the current working directory: " + os.path.realpath(input_dir))
+    print("Does directory " + input_dir + " exist? " + str(os.path.exists(input_dir)))
+    print("Does file " + os.path.join(input_dir,'buildings.shp') + " exist? " + str(os.path.exists(os.path.join(input_dir,'buildings.shp'))))
+    print("Does file " + os.path.join(input_dir,'roads.shp') + " exist? " + str(os.path.exists(os.path.join(input_dir,'roads.shp'))))
+    print("Does file " + os.path.join(input_dir,'vegetation.shp') + " exist? " + str(os.path.exists(os.path.join(input_dir,'vegetation.shp'))))
+    print("Does file " + os.path.join(input_dir,'aggregation.shp') + " exist? " + str(os.path.exists(os.path.join(input_dir,'aggregation.shp'))))
+    sys.exit(0)
+            
 building_height_name = "HAUTEUR"
 building_id_name = "ID"
 aggregation_id_name = "DCOMIRIS"
 road_id = "ID"
+
+# Check if the ouput directory already exists
+if os.path.exists(output_dir):
+    print("Output path already exists. I won't overwrite, sorry.")
+    sys.exit(0)
+
+# Create it
+os.makedirs(output_dir)
 
 # add fields
 fields = QgsFields()
@@ -90,7 +110,7 @@ for elem in layer_buildings.getFeatures():
     height = elem.attribute(building_height_name)
     ident = elem.attribute(building_id_name)
     #    print(ident)
-    #recherche de l'aggregation à laquelle appartient le batiment
+    #recherche de l'aggregation a laquelle appartient le batiment
     aggregation_id = find(geom,aggregation_index,aggregation_dict,aggregation_id_name)
     #calcul des indicateurs a l'echelle du batiment
     distToRoadMin, road = distance_from_polygon_to_layer(geom, road_index, road_dict, road_id)

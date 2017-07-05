@@ -1,0 +1,28 @@
+// Declare the variable
+val input = Val[File]
+val output = Val[File]
+val dataDirs  = Val[Array[File]]
+val value = Val[Int]
+val display = Val[String]
+
+// python task
+val pythonTask =
+  CARETask(workDirectory / "myapp.tgz.bin", "xvfb-run python3 /home/julien/devel/UrbanFabricAnalysis/app.py data result") set (
+    inputs += input,
+    inputFiles += (input, "/home/julien/myapp/data"),
+    outputFiles += ("result", output),
+    outputs += input,
+    value := 1,
+    display := ":0",
+    environmentVariable += (value, "PROOT_NO_SECCOMP"),
+    environmentVariable += (display, "DISPLAY")
+  )
+
+val exploration = ExplorationTask(input in dataDirs)
+
+// will fill dataDirs with all the subdirectories of "directory" starting with data
+val s = ListDirectoriesSource(workDirectory, dataDirs, "^data.*")
+  
+val copy = CopyFileHook(output, workDirectory / "results")
+val env = LocalEnvironment(4)
+(exploration source s) -< (pythonTask hook copy on env)
