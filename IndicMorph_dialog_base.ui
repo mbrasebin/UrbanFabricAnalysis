@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
-    <height>300</height>
+    <width>406</width>
+    <height>324</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,10 +16,10 @@
   <widget class="QDialogButtonBox" name="button_box">
    <property name="geometry">
     <rect>
-     <x>50</x>
-     <y>260</y>
-     <width>341</width>
-     <height>32</height>
+     <x>120</x>
+     <y>250</y>
+     <width>241</width>
+     <height>31</height>
     </rect>
    </property>
    <property name="orientation">
@@ -29,21 +29,11 @@
     <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
    </property>
   </widget>
-  <widget class="QComboBox" name="couche">
+  <widget class="QComboBox" name="bati">
    <property name="geometry">
     <rect>
-     <x>80</x>
+     <x>20</x>
      <y>30</y>
-     <width>221</width>
-     <height>22</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QComboBox" name="indicateur">
-   <property name="geometry">
-    <rect>
-     <x>80</x>
-     <y>230</y>
      <width>221</width>
      <height>22</height>
     </rect>
@@ -52,7 +42,7 @@
   <widget class="QLabel" name="label">
    <property name="geometry">
     <rect>
-     <x>70</x>
+     <x>20</x>
      <y>10</y>
      <width>121</width>
      <height>16</height>
@@ -62,23 +52,10 @@
     <string>Couche bâtie</string>
    </property>
   </widget>
-  <widget class="QLabel" name="label_2">
-   <property name="geometry">
-    <rect>
-     <x>70</x>
-     <y>210</y>
-     <width>111</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Indicateur à calculer</string>
-   </property>
-  </widget>
   <widget class="QComboBox" name="routes">
    <property name="geometry">
     <rect>
-     <x>80</x>
+     <x>20</x>
      <y>80</y>
      <width>221</width>
      <height>22</height>
@@ -88,7 +65,7 @@
   <widget class="QLabel" name="label_3">
    <property name="geometry">
     <rect>
-     <x>70</x>
+     <x>20</x>
      <y>60</y>
      <width>131</width>
      <height>16</height>
@@ -101,7 +78,7 @@
   <widget class="QComboBox" name="iris">
    <property name="geometry">
     <rect>
-     <x>80</x>
+     <x>20</x>
      <y>180</y>
      <width>221</width>
      <height>22</height>
@@ -111,7 +88,7 @@
   <widget class="QLabel" name="label_4">
    <property name="geometry">
     <rect>
-     <x>70</x>
+     <x>20</x>
      <y>160</y>
      <width>121</width>
      <height>16</height>
@@ -124,7 +101,7 @@
   <widget class="QLabel" name="label_6">
    <property name="geometry">
     <rect>
-     <x>70</x>
+     <x>20</x>
      <y>110</y>
      <width>141</width>
      <height>16</height>
@@ -137,7 +114,7 @@
   <widget class="QComboBox" name="vegetation">
    <property name="geometry">
     <rect>
-     <x>80</x>
+     <x>20</x>
      <y>130</y>
      <width>221</width>
      <height>22</height>
