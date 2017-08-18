@@ -20,10 +20,11 @@
  *                                                                         *
  ***************************************************************************/
 """
-from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant, Qt
-from PyQt4.QtGui import QAction, QIcon, QProgressBar, QMessageBox, QTransform, QComboBox
+from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant, Qt
+from PyQt5.QtGui import QIcon, QTransform
+from PyQt5.QtWidgets import QAction, QProgressBar, QMessageBox, QComboBox
 # Initialize Qt resources from file resources.py
-import resources
+from .resources import *
 # Import the code for the dialog
 from IndicMorph_dialog import IndicateursMorphoDialog
 import os.path
@@ -398,16 +399,14 @@ class IndicateursMorpho:
         #calcule l'indicateur de landsberg pour la rue
     
         #selection des batiments proches de la rue de chaque cote
-        b_rue = rue.geometry().buffer(500,7).boundingBox()
-        batis_id = sIndex_bati.intersects(b_rue)
-        res, new_geoms, test_points = QgsGeometry.fromRect(b_rue).splitGeometry(rue.geometry().asMultiPoint(),True)
-        lb_rue2 = [geom for geom in new_geoms]
-        b_rue2 = lb_rue2[0]
+        b_rue = rue.singleSidedBuffer(500,7,QgsGeometry.SideLeft)
+        b_rue2 = rue.singleSidedBuffer(500,7,QgsGeometry.SideRight)
         buffers_rue = [b_rue,b_rue2]
         #calcul de la projection de chaque batiment sur la rue pour chaque cote
         for i in [0,1]:
             buff_rue = buffers_rue[i]
             voisinage = []
+            batis_id = sIndex_bati.intersects(buff_rue.boundingBox())
             for bati_id in batis_id:
                 if features_bati[bati_id].intersects(buff_rue):
                     voisinage += [bati_id]
