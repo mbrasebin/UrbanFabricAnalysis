@@ -22,7 +22,7 @@
 """
 from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant, Qt
 from PyQt5.QtGui import QIcon, QTransform
-from PyQt5.QtWidgets import QAction, QProgressBar, QMessageBox
+from PyQt5.QtWidgets import QAction, QProgressBar, QMessageBox, QComboBox
 # Initialize Qt resources from file resources.py
 from .resources import *
 # Import the code for the dialog
@@ -183,32 +183,25 @@ class IndicateursMorpho:
         # remove the toolbar
         del self.toolbar    
 
+
     def run(self):
         """Run method that performs all the real work"""
 
-        self.dlg.couche.clear()
-        self.dlg.indicateur.clear()
+        self.dlg.bati.clear()
         self.dlg.routes.clear()
+        self.dlg.vegetation.clear()
         self.dlg.iris.clear()
 
         #set the couche combobox items
         layers = QgsProject.instance().mapLayers().values()
         for layer in layers:
-            self.dlg.couche.addItem(layer.name(),layer)
+            self.dlg.bati.addItem(layer.name(),layer)
             self.dlg.routes.addItem(layer.name(),layer)
             self.dlg.vegetation.addItem(layer.name(),layer)
             self.dlg.iris.addItem(layer.name(),layer)
 
-        #set the indicateur combobox items
-        self.dlg.indicateur.addItem("elongation")
-        self.dlg.indicateur.addItem("aire")
-        self.dlg.indicateur.addItem("aire / perimetre")
-        self.dlg.indicateur.addItem("distance a la route")
-        self.dlg.indicateur.addItem("complexite")
-        self.dlg.indicateur.addItem("facteur de forme")
-        self.dlg.indicateur.addItem("coefficient d'emprise au sol")
-        self.dlg.indicateur.addItem("densite batie")
-        self.dlg.indicateur.addItem("densite vegetale")
+        
+
 
         # show the dialog
         self.dlg.show()
@@ -222,21 +215,83 @@ class IndicateursMorpho:
             print("Bravo")
             
             #get the index of the combobox
-            indexCouche = self.dlg.couche.currentIndex()
-            indexIndicateur = self.dlg.indicateur.currentIndex()
+            indexBati = self.dlg.bati.currentIndex()
             indexRoutes = self.dlg.routes.currentIndex()
             indexVegetation = self.dlg.vegetation.currentIndex()
             indexIRIS = self.dlg.iris.currentIndex()
-            layer_bati = self.dlg.couche.itemData(indexCouche)
+            layer_bati = self.dlg.bati.itemData(indexBati)
             layer_routes = self.dlg.routes.itemData(indexRoutes)
             features_road = {RFeature.id(): RFeature for RFeature in layer_routes.getFeatures()}
             layer_vegetation = self.dlg.vegetation.itemData(indexVegetation)
             layer_IRIS = self.dlg.iris.itemData(indexIRIS)
 
-            #liste_IRIS = sorted([f.attribute("DCOMIRIS") for f in layer_IRIS.getFeatures()])
-#            for f in layer_IRIS.getFeatures():
-#                n=f.attribute("DCOMIRIS")
-#                liste_IRIS = addListe(liste_IRIS,0,int(n))
+            #definition des attributs utiles
+            #HauteurBatiments
+            """            
+            bati_attributes = [layer_bati.attributeDisplayName(i) for i in layer_bati.attributeList()]
+            h_cmbBox = QComboBox(self.iface.mainWindow())
+            for a in bati_attributes:
+                h_cmbBox.addItem(a)
+            h_cmbBox.show()
+            h_cmbBox.showPopup()
+            QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","Hauteur Batiment")
+            height_name = h_cmbBox.currentText()
+            self.iface.messageBar().pushMessage(height_name)
+            #ID Batiments
+            bid_cmbBox = QComboBox()
+#            bid_cmbBox.show()
+            for a in bati_attributes:
+                bid_cmbBox.addItem(a)
+            bid_cmbBox.showPopup()
+            QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","ID Batiment")
+            building_id_name = bid_cmbBox.currentText()
+
+            #ID IRIS
+            iris_attributes = [layer_IRIS.attributeDisplayName(i) for i in layer_IRIS.attributeList()]
+            iris_cmbBox = QComboBox()
+#            iris_cmbBox.show()
+            for a in iris_attributes:
+                iris_cmbBox.addItem(a)
+            iris_cmbBox.showPopup()
+            QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","ID IRIS")
+            IRIS_id_name = iris_cmbBox.currentText()
+            
+            #Importance Routes
+            routes_attributes = [layer_routes.attributeDisplayName(i) for i in layer_routes.attributeList()]
+            imp_cmbBox = QComboBox()
+#            imp_cmbBox.show()
+            for a in routes_attributes:
+                imp_cmbBox.addItem(a)
+            imp_cmbBox.showPopup()
+            QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","Importance des routes")
+            importance_name = imp_cmbBox.currentText()
+            
+            #Largeur Routes
+            larg_cmbBox = QComboBox()
+#            larg_cmbBox.show()
+            for a in routes_attributes:
+                larg_cmbBox.addItem(a)
+            larg_cmbBox.showPopup()
+            QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","Largeur des routes")
+            width_name = larg_cmbBox.currentText()
+            """
+            IRIS_id_name = "DCOMIRIS"
+            routes_id_name = "ID"
+            importance_name = "IMPORTANCE"
+            width_name = "LARGEUR"
+            building_id_name = "ID"
+            height_name = "HAUTEUR"
+            
+            liste_IRIS = {IFeature.attribute(IRIS_id_name) : IFeature for IFeature in layer_IRIS.getFeatures()}
+            liste_IRISBatis = []
+            features_bati = {BFeature.attribute(building_id_name) : BFeature for BFeature in layer_bati.getFeatures()}
+            """
+            #dict
+            liste_IRIS = []
+            for f in layer_IRIS.getFeatures():
+                n=f.attribute(IRIS_id_name)
+                liste_IRIS = self.addListe(liste_IRIS,0,int(n))
+            """            
 
             # create layer
             vl = QgsVectorLayer("Polygon", layer_bati.name(), "memory")
@@ -263,8 +318,9 @@ class IndicateursMorpho:
                 QgsField("distToRoad",QVariant.Double),
                 QgsField("complexity",QVariant.Double),
                 QgsField("formFactor", QVariant.Double),
-                QgsField("nearRoad",QVariant.String),
-                QgsField("SMBR_angle_90", QVariant.Double)]
+#                QgsField("SMBR_angle_90", QVariant.Double)]
+                QgsField("formIndice",QVariant.Double),
+                QgsField("nearRoad",QVariant.String)]
 
             #create spatial indexes
             index_routes = QgsSpatialIndex()
@@ -273,7 +329,7 @@ class IndicateursMorpho:
             for f in layer_bati.getFeatures(): index_bati.insertFeature(f)
             index_IRIS = QgsSpatialIndex()
             for f in layer_IRIS.getFeatures(): index_IRIS.insertFeature(f)
-            
+
             # add the new measures to the features
             pr.addAttributes( fields )
             vl.updateFields()
@@ -285,8 +341,6 @@ class IndicateursMorpho:
             progressMessageBar.layout().addWidget(progress)
             self.iface.messageBar().pushWidget(progressMessageBar, self.iface.messageBar().INFO)
 
-            IRIS_id_name = "DCOMIRIS"
-            routes_id_name = "ID"
             # Create dictionaries of all features
             IRIS_dict = {f.id(): f for f in layer_IRIS.getFeatures()}
             routes_dict = {f.id(): f for f in layer_routes.getFeatures()}
@@ -298,7 +352,10 @@ class IndicateursMorpho:
             distance_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
             complexity_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
             form_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            form_index_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+
             veg_density_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            landsberg_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
 
             featureList = []
             i = 0            
@@ -307,8 +364,9 @@ class IndicateursMorpho:
                 geom = f.geometry()
                 area = geom.area()
                 perimeter = geom.length()
-                hauteur = f.attribute("HAUTEUR")
-                ident = f.attribute("ID")
+                hauteur = f.attribute(height_name)
+                #99
+                ident = f.attribute(building_id_name)
 
                 #recherche de l'IRIS du batiment
                 iris_id = find(geom,index_IRIS,IRIS_dict,IRIS_id_name)
@@ -322,7 +380,8 @@ class IndicateursMorpho:
                 elongation = compute_elongation(SMBR_height, SMBR_width)
                 compactness = compute_compactness(area, perimeter)
                 complexity = len(geom.asPolygon()[0]) - 1
-                formFactor = compute_formFactor(hauteur, SMBR_area)
+                formFactor = compute_formFactor(hauteur, SMBR_width, SMBR_height)
+                formIndice = compute_formIndice(hauteur, area)
                 #remplissage des listes pour les calculs a l'echelle de l'IRIS
                 if iris_id != 0:
                     elongation_dict[iris_id].append(elongation)
@@ -333,10 +392,12 @@ class IndicateursMorpho:
                     distance_dict[iris_id].append(distToRoadMin)
                     complexity_dict[iris_id].append(complexity)
                     form_dict[iris_id].append(formFactor)
+                    form_index_dict[iris_id].append(formIndice)
 
                 feat = QgsFeature()
                 feat.setGeometry( geom )
                 feat.initAttributes(len(fields))
+                #99
                 feat.setAttribute( 0, ident)
                 feat.setAttribute( 1, area )
                 feat.setAttribute( 2, area * hauteur)
@@ -354,8 +415,10 @@ class IndicateursMorpho:
                     feat.setAttribute( 13, distToRoadMin)
                 feat.setAttribute( 14, complexity)
                 feat.setAttribute( 15, formFactor)
-                feat.setAttribute( 16, nRoad)
-                feat.setAttribute( 17, SMBR_angle%90)
+                #feat.setAttribute( 17, SMBR_angle%90)
+                feat.setAttribute( 16, formIndice)
+                #99
+                feat.setAttribute(17, nRoad)
                 featureList.append(feat)
                 i += 1
                 progress.setValue(i)
@@ -370,6 +433,10 @@ class IndicateursMorpho:
                 for element in iris_areasV:
                     veg_density_dict[element[0]].append(element[1])
 
+            for fRoad in layer_routes.getFeatures():
+                iris_r = findIRIS_line(fRoad.geometry(),layer_IRIS,IRIS_id_name)
+                landsberg_dict[iris_r].append(compute_landsberg(fRoad,index_bati,features_bati,height_name))
+                
             # create layer iris
             irisBis = QgsVectorLayer("Polygon", layer_IRIS.name(), "memory")
             prBis = irisBis.dataProvider()
@@ -410,7 +477,13 @@ class IndicateursMorpho:
                 QgsField("formF_med",QVariant.Double),
                 QgsField("formF_moy",QVariant.Double),
                 QgsField("formF_ect",QVariant.Double),
-                QgsField("formF_dec",QVariant.String)
+                QgsField("formF_dec",QVariant.Double),
+                QgsField("formI_med",QVariant.Double),
+                QgsField("formI_moy",QVariant.Double),
+                QgsField("formI_ect",QVariant.Double),
+                QgsField("lands_med",QVariant.Double),
+                QgsField("lands_moy",QVariant.Double),
+                QgsField("lands_ect",QVariant.Double)
                 ]
             
             # add the new measures to the features
@@ -433,23 +506,8 @@ class IndicateursMorpho:
                 dens_vegetaleI = veg_density_dict[ID]
                 complexitiesI = complexity_dict[ID]
                 formFactorsI = form_dict[ID]
-
-                #if nb_batiments > 0:
-                #    print(ID)
-                #    print("Area")
-                #    print(deciles(areasI))
-                #    print("Volume")
-                #    print(deciles(volumesI))
-                #    print("Elongation")
-                #    print(deciles(elongationsI))
-                #    print("Area / perimeter")
-                #    print(deciles(area_perimetersI))
-                #    print("Distance to road")
-                #    print(deciles(distToRoadsI))
-                #    print("Complexity")
-                #    print(deciles(complexitiesI))
-                #    print("Form factor")
-                #    print(deciles(formFactorsI))
+                formIndicesI = form_index_dict[ID]
+                landsbergI = landsberg_dict[ID]
 
                 feat = QgsFeature()
                 feat.setGeometry( geomI )
@@ -487,8 +545,14 @@ class IndicateursMorpho:
                     feat.setAttribute( 29, mean(formFactorsI))
                     feat.setAttribute( 30, standard_deviation(formFactorsI))
                     feat.setAttribute( 31, deciles_as_str(formFactorsI))
+                    feat.setAttribute( 32, median(formIndicesI))
+                    feat.setAttribute( 33, mean(formIndicesI))
+                    feat.setAttribute( 34, standard_deviation(formIndicesI))
+                    feat.setAttribute( 35, median(landsbergI))
+                    feat.setAttribute( 36, mean(landsbergI))
+                    feat.setAttribute( 37, standard_deviation(landsbergI))
 
-                featureListBis.append(feat)            
+                featureListBis.append(feat)
 
             prBis.addFeatures( featureListBis ) 
             irisBis.commitChanges()
