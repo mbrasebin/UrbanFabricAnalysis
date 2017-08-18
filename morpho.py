@@ -153,10 +153,13 @@ def compute_formIndice(hauteur, area):
     return formIndice
 
 def fusionI(a_traiter, i):
+    print("fusionI")
+    print(a_traiter)
+    print(i)
     #renvoie une liste des batiments les plus proches de la rue d'un cote donne pour chaque abscisse de l'intervalle i par rapport a l'ajout de i_new
 
     #le batiment a_traiter est plus eloigne que le batiment i
-    if i[2] <= a_traiter:
+    if i[2] <= a_traiter[2]:
         return [i]
     else:
         #les 2 intervalles s'intersectent
@@ -178,6 +181,9 @@ def fusionI(a_traiter, i):
 
 def gestion_dist_rec(i_new,intervalles):
     #ajoute un intervalle i_new a l'ensemble des intervalles d'un cote donnant le batiment le plus proche de la rue pour ces abscisses
+    print("gestion_dist_rec")
+    print(i_new)
+    print(intervalles)
     if intervalles == []:
         return [i_new]
     else:
@@ -196,43 +202,40 @@ def gestion_distance(intervalles1):
     #ne conserve pour chaque partie de la rue que le batiment le plus proche d'un cote donne
     intervalles2=[]
     #on considere successivement les differents intervalles de inttervalles1 en faisant evoluer intervalles2
+    print("gestion_distance")
+    print(intervalles1)
     for i_new in intervalles1:
         intervalles2 = gestion_dist_rec(i_new,intervalles2)
     return intervalles2
 
 def compute_landsberg(rue, sIndex_bati, features_bati, nom_hauteur):
     #calcule l'indicateur de landsberg pour la rue
-    
     #selection des batiments proches de la rue de chaque cote
-    b_rue = rue.geometry().buffer(500,7).boundingBox()
-    batis_id = sIndex_bati.intersects(b_rue)
-    res, new_geoms, test_points = QgsGeometry.fromRect(b_rue).splitGeometry(rue.geometry().asMultiPoint(),True)
-    lb_rue2 = [geom for geom in new_geoms]
-    if len(lb_rue2) == 0:
-        return 0
-    b_rue2 = lb_rue2[0]
+    b_rue = rue.geometry().singleSidedBuffer(500,7,QgsGeometry.SideLeft)
+    b_rue2 = rue.geometry().singleSidedBuffer(500,7,QgsGeometry.SideRight)
     buffers_rue = [b_rue,b_rue2]
     #calcul de la projection de chaque batiment sur la rue pour chaque cote
     for i in [0,1]:
         buff_rue = buffers_rue[i]
         voisinage = []
+        batis_id = sIndex_bati.intersects(buff_rue.boundingBox())
         for bati_id in batis_id:
-            if features_bati[bati_id].intersects(buff_rue):
+            if features_bati[bati_id].geometry().intersects(buff_rue):
                 voisinage += [bati_id]
+        intervalles = []
         for voisin_id in voisinage:
             voisin = features_bati[voisin_id]
             init = False
-            intervalles = []
             for point in voisin.geometry().asPolygon()[0]:
-                x = rue.geometry().lineLocatePoint(point)
+                x = rue.geometry().lineLocatePoint(QgsGeometry.fromPoint(point))
                 if not init:
                     mini = x
                     maxi = x
                 else:
                     mini = min(x,mini)
                     maxi = max(x,maxi)
-            disR = voisin.distance(rue)
-            intervalles += [voisin_id,[mini,maxi],disR]
+            disR = voisin.geometry().distance(rue.geometry())
+            intervalles += [[voisin_id,[mini,maxi],disR]]
         if i == 0:
             intervalles01 = intervalles
         else:
@@ -242,7 +245,7 @@ def compute_landsberg(rue, sIndex_bati, features_bati, nom_hauteur):
     intervalles02 = gestion_distance(intervalles01)
     intervalles12 = gestion_distance(intervalles11)
     intervalles2 = gestion_cotes(intervalles11,intervalles12)
-    
+
     #calcul de l'indicateur sur chaque intervalle ou 2 batiments se font face
     landsberg = 0
     for i in intervalles2 :

@@ -172,7 +172,6 @@ class IndicateursMorpho:
             callback=self.run,
             parent=self.iface.mainWindow())
 
-
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
@@ -181,17 +180,14 @@ class IndicateursMorpho:
                 action)
             self.iface.removeToolBarIcon(action)
         # remove the toolbar
-        del self.toolbar    
-
+        del self.toolbar
 
     def run(self):
         """Run method that performs all the real work"""
-
         self.dlg.bati.clear()
         self.dlg.routes.clear()
         self.dlg.vegetation.clear()
         self.dlg.iris.clear()
-
         #set the couche combobox items
         layers = QgsProject.instance().mapLayers().values()
         for layer in layers:
@@ -199,21 +195,13 @@ class IndicateursMorpho:
             self.dlg.routes.addItem(layer.name(),layer)
             self.dlg.vegetation.addItem(layer.name(),layer)
             self.dlg.iris.addItem(layer.name(),layer)
-
-        
-
-
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
-        
         # See if OK was pressed
         if result:
-
-
             print("Bravo")
-            
             #get the index of the combobox
             indexBati = self.dlg.bati.currentIndex()
             indexRoutes = self.dlg.routes.currentIndex()
@@ -224,7 +212,6 @@ class IndicateursMorpho:
             features_road = {RFeature.id(): RFeature for RFeature in layer_routes.getFeatures()}
             layer_vegetation = self.dlg.vegetation.itemData(indexVegetation)
             layer_IRIS = self.dlg.iris.itemData(indexIRIS)
-
             #definition des attributs utiles
             #HauteurBatiments
             """            
@@ -344,6 +331,7 @@ class IndicateursMorpho:
             # Create dictionaries of all features
             IRIS_dict = {f.id(): f for f in layer_IRIS.getFeatures()}
             routes_dict = {f.id(): f for f in layer_routes.getFeatures()}
+            building_dict = {f.id(): f for f in layer_bati.getFeatures()}
             area_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
             elongation_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
             area_perimeter_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
@@ -426,16 +414,29 @@ class IndicateursMorpho:
             pr.addFeatures (featureList)
             vl.commitChanges()
 
+            progressMessageBar = self.iface.messageBar().createMessage("Handling vegetation")
+            progress.reset()
+            progress.setMaximum(layer_vegetation.featureCount())
+            i = 0
             for fVeget in layer_vegetation.getFeatures():
                 geomV = fVeget.geometry()
                 #areaV = geomV.area()
                 iris_areasV = find_areas(geomV,index_IRIS,IRIS_dict,IRIS_id_name)
                 for element in iris_areasV:
                     veg_density_dict[element[0]].append(element[1])
+                i += 1
+                progress.setValue(i)
 
+
+            progressMessageBar = self.iface.messageBar().createMessage("Handling roads")
+            progress.reset()
+            progress.setMaximum(layer_routes.featureCount())
+            i = 0
             for fRoad in layer_routes.getFeatures():
                 iris_r = findIRIS_line(fRoad.geometry(),layer_IRIS,IRIS_id_name)
-                landsberg_dict[iris_r].append(compute_landsberg(fRoad,index_bati,features_bati,height_name))
+                landsberg_dict[iris_r].append(compute_landsberg(fRoad,index_bati,building_dict,height_name))
+                i += 1
+                progress.setValue(i)
                 
             # create layer iris
             irisBis = QgsVectorLayer("Polygon", layer_IRIS.name(), "memory")
