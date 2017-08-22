@@ -26,11 +26,11 @@ from PyQt5.QtWidgets import QAction, QProgressBar, QMessageBox, QComboBox
 # Initialize Qt resources from file resources.py
 from .resources import *
 # Import the code for the dialog
-from IndicMorph_dialog import IndicateursMorphoDialog
+from .IndicMorph_dialog import IndicateursMorphoDialog
 import os.path
 import math
-from qgis.core import QgsVectorLayer, QgsFeature, QgsSpatialIndex, QgsVectorFileWriter, QgsMapLayerRegistry
-from qgis.core import QgsFeatureRequest, QgsField, QgsGeometry, QgsPoint, QgsRectangle
+from qgis.core import QgsVectorLayer, QgsFeature, QgsSpatialIndex, QgsVectorFileWriter, QgsProject
+from qgis.core import QgsFeatureRequest, QgsField, QgsGeometry, QgsPoint, QgsRectangle, QgsPointXY
 
 
 
@@ -241,7 +241,7 @@ class IndicateursMorpho:
                 height = bounds.height()
             pt2 = pt1
         minBounds = QgsGeometry.fromRect( minRect )
-        minBounds.rotate( angle, QgsPoint( pt0.x(), pt0.y() ) )
+        minBounds.rotate( angle, QgsPointXY( pt0.x(), pt0.y() ) )
         if ( angle > 180.0 ):
             angle = math.fmod( angle, 180.0 )
         return minBounds, area, angle, width, height
@@ -342,6 +342,23 @@ class IndicateursMorpho:
         formIndice = hauteur**2 / area
         return formIndice
 
+    def gestion_cotes_rec(self, ret, intervalle, intervalles12):
+        if intervalles12 == [] or intervalle[1][1]<intervalles12[0][1][0]:
+            return ret
+        elif intervalle[1][0]>intervalles12[0][1][1]:
+            return self.gestion_cotes_rec(ret, intervalle, intervalles12[1:])
+        else:
+            ret += [[intervalle[0],intervalles12[0][0]],[max(intervalle[1][0],intervalles12[0][1][0]),min(intervalle[1][1],intervalles12[0][1][1])],intervalle[2]+intervalles12[0][2]]
+            return self.gestion_cotes_rec(ret, intervalle, intervalles12[1:])
+        
+
+    def gestion_cotes(self, intervalles11, intervalles12):
+        res = []
+        for i in intervalles11:
+            res += self.gestion_cotes_rec([],i,intervalles12)
+        return res
+        
+
     def fusionI(self, a_traiter, i):
         #renvoie une liste des batiments les plus proches de la rue d'un cote donne pour chaque abscisse de l'intervalle i par rapport a l'ajout de i_new
 
@@ -399,17 +416,23 @@ class IndicateursMorpho:
         #calcule l'indicateur de landsberg pour la rue
     
         #selection des batiments proches de la rue de chaque cote
-        b_rue = rue.singleSidedBuffer(500,7,QgsGeometry.SideLeft)
-        b_rue2 = rue.singleSidedBuffer(500,7,QgsGeometry.SideRight)
+        b_rue = rue.geometry().singleSidedBuffer(500,7,QgsGeometry.SideLeft)
+        b_rue2 = rue.geometry().singleSidedBuffer(500,7,QgsGeometry.SideRight)
         buffers_rue = [b_rue,b_rue2]
+        gdbuff_rue = b_rue.combine(b_rue2)
+        batis_id = sIndex_bati.intersects(gdbuff_rue.boundingBox())
+        print(batis_id)
+        batis_id_2c = [[],[]]
+        for bati_id in batis_id:
+            if features_bati[bati_id].geometry().intersects(b_rue):
+                batis_id_2c[0] += bati_id
+            elif features_bati[bati_id].geometry().intersects(b_rue2):
+                batis_id_2c[1] += bati_id
         #calcul de la projection de chaque batiment sur la rue pour chaque cote
         for i in [0,1]:
             buff_rue = buffers_rue[i]
-            voisinage = []
-            batis_id = sIndex_bati.intersects(buff_rue.boundingBox())
-            for bati_id in batis_id:
-                if features_bati[bati_id].intersects(buff_rue):
-                    voisinage += [bati_id]
+            voisinage = batis_id_2c[i]
+            intervalles = []
             for voisin_id in voisinage:
                 voisin = features_bati[voisin_id]
                 init = False
@@ -419,6 +442,7 @@ class IndicateursMorpho:
                     if not init:
                         mini = x
                         maxi = x
+                        init = True
                     else:
                         mini = min(x,mini)
                         maxi = max(x,maxi)
@@ -436,10 +460,15 @@ class IndicateursMorpho:
 
         #calcul de l'indicateur sur chaque intervalle ou 2 batiments se font face
         landsberg = 0
+        som_int = 0
         for i in intervalles2 :
-            hauteur = features_bati[i[0]].attribute(nom_hauteur)
-            landsberg += (intervalles2[1][1]-intervalles2[1][0])*hauteur/i[2]
-        landsberg = landsberg / som_int
+            hauteur1 = features_bati[i[0][0]].attribute(nom_hauteur)
+            hauteur2 = features_bati[i[0][1]].attribute(nom_hauteur)
+            hauteur_moy = (hauteur1 + hauteur2)/2.
+            som_int += i[1][1]-i[1][0]
+            landsberg += (i[1][1]-i[1][0])*hauteur_moy/i[2]
+        if som_int > 0:
+            landsberg = landsberg / som_int
         return landsberg
     
     def moyenne(self, l):
@@ -492,7 +521,7 @@ class IndicateursMorpho:
         self.dlg.iris.clear()
 
         #set the couche combobox items
-        layers = QgsMapLayerRegistry.instance().mapLayers().values()
+        layers = QgsProject.instance().mapLayers().values()
         for layer in layers:
             self.dlg.bati.addItem(layer.name(),layer)
             self.dlg.routes.addItem(layer.name(),layer)
@@ -578,7 +607,7 @@ class IndicateursMorpho:
             
             liste_IRIS = {IFeature.attribute(nom_idIRIS) : IFeature for IFeature in layer_IRIS.getFeatures()}
             liste_IRISBatis = []
-            features_bati = {BFeature.attribute(nom_idBati) : BFeature for BFeature in layer_bati.getFeatures()}
+            features_bati = {BFeature.id() : BFeature for BFeature in layer_bati.getFeatures()}
             """
             #dict
             liste_IRIS = []
@@ -805,12 +834,12 @@ class IndicateursMorpho:
                 areaV = geomV.area()
                 iris_areasV = self.findIRIS_areas(geomV,layer_IRIS,nom_idIRIS)
                 for element in iris_areasV:
-                    if dens_vegetale.has_key(element[0]):
+                    if element[0] in dens_vegetale:
                         dens_vegetale[element[0]] += element[1]
 
             for fRoad in layer_routes.getFeatures():
                 iris_r = self.findIRIS_line(fRoad.geometry(),layer_IRIS,nom_idIRIS)
-                if landsberg.has_key(iris_r):
+                if iris_r in landsberg:
                     landsberg[iris_r] += [self.compute_landsberg(fRoad,SIndex_bati,features_bati,nom_hauteur)]
                 
 
@@ -983,8 +1012,8 @@ class IndicateursMorpho:
                 ind = "convexity depending on SMBR" """
                 
 
-            QgsMapLayerRegistry.instance().addMapLayer(vl)
-            QgsMapLayerRegistry.instance().addMapLayer(irisBis)
+            QgsProject.instance().addMapLayer(vl)
+            QgsProject.instance().addMapLayer(irisBis)
             #QMessageBox.information(self.iface.mainWindow(),ind,str(res))
 
             self.iface.messageBar().clearWidgets()
