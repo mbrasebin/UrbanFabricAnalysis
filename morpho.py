@@ -153,9 +153,9 @@ def compute_formIndice(hauteur, area):
     return formIndice
 
 def fusionI(a_traiter, i):
-    print("fusionI")
-    print(a_traiter)
-    print(i)
+    #print("fusionI")
+    #print(a_traiter)
+    #print(i)
     #renvoie une liste des batiments les plus proches de la rue d'un cote donne pour chaque abscisse de l'intervalle i par rapport a l'ajout de i_new
 
     #le batiment a_traiter est plus eloigne que le batiment i
@@ -181,9 +181,9 @@ def fusionI(a_traiter, i):
 
 def gestion_dist_rec(i_new,intervalles):
     #ajoute un intervalle i_new a l'ensemble des intervalles d'un cote donnant le batiment le plus proche de la rue pour ces abscisses
-    print("gestion_dist_rec")
-    print(i_new)
-    print(intervalles)
+    #print("gestion_dist_rec")
+    #print(i_new)
+    #print(intervalles)
     if intervalles == []:
         return [i_new]
     else:
@@ -202,11 +202,26 @@ def gestion_distance(intervalles1):
     #ne conserve pour chaque partie de la rue que le batiment le plus proche d'un cote donne
     intervalles2=[]
     #on considere successivement les differents intervalles de inttervalles1 en faisant evoluer intervalles2
-    print("gestion_distance")
-    print(intervalles1)
+    #print("gestion_distance")
+    #print(intervalles1)
     for i_new in intervalles1:
         intervalles2 = gestion_dist_rec(i_new,intervalles2)
     return intervalles2
+
+def gestion_cotes_rec(ret, intervalle, intervalles12):
+    if intervalles12 == [] or intervalle[1][1]<intervalles12[0][1][0]:
+        return ret
+    elif intervalle[1][0]>intervalles12[0][1][1]:
+        return gestion_cotes_rec(ret, intervalle, intervalles12[1:])
+    else:
+        ret += [[intervalle[0],intervalles12[0][0]],[max(intervalle[1][0],intervalles12[0][1][0]),min(intervalle[1][1],intervalles12[0][1][1])],intervalle[2]+intervalles12[0][2]]
+        return gestion_cotes_rec(ret, intervalle, intervalles12[1:])
+
+def gestion_cotes(intervalles11, intervalles12):
+    res = []
+    for i in intervalles11:
+        res += [gestion_cotes_rec([],i,intervalles12)]
+    return res
 
 def compute_landsberg(rue, sIndex_bati, features_bati, nom_hauteur):
     #calcule l'indicateur de landsberg pour la rue
@@ -214,10 +229,41 @@ def compute_landsberg(rue, sIndex_bati, features_bati, nom_hauteur):
     b_rue = rue.geometry().singleSidedBuffer(500,7,QgsGeometry.SideLeft)
     b_rue2 = rue.geometry().singleSidedBuffer(500,7,QgsGeometry.SideRight)
     buffers_rue = [b_rue,b_rue2]
+    gdbuff_rue = b_rue.combine(b_rue2)
+    batis_id = sIndex_bati.intersects(gdbuff_rue.boundingBox())
+    print(batis_id)
+    batis_id_2c = [[],[]]
+    for bati_id in batis_id:
+        if features_bati[bati_id].geometry().intersects(b_rue):
+            batis_id_2c[0] += [bati_id]
+        elif features_bati[bati_id].geometry().intersects(b_rue2):
+            batis_id_2c[1] += [bati_id]
     #calcul de la projection de chaque batiment sur la rue pour chaque cote
     for i in [0,1]:
         buff_rue = buffers_rue[i]
-        voisinage = []
+        voisinage = batis_id_2c[i]
+        intervalles = []
+        for voisin_id in voisinage:
+            voisin = features_bati[voisin_id]
+            init = False
+            intervalles = []
+            for point in voisin.geometry().asPolygon()[0]:
+                x = rue.geometry().lineLocatePoint(QgsGeometry.fromPoint(point))
+                if not init:
+                    mini = x
+                    maxi = x
+                    init = True
+                else:
+                    mini = min(x,mini)
+                    maxi = max(x,maxi)
+            disR = voisin.geometry().distance(rue.geometry())
+            intervalles += [[voisin_id,[mini,maxi],disR]]
+        if i == 0:
+            intervalles01 = intervalles
+        else:
+            intervalles11 = intervalles
+
+        """
         batis_id = sIndex_bati.intersects(buff_rue.boundingBox())
         for bati_id in batis_id:
             if features_bati[bati_id].geometry().intersects(buff_rue):
@@ -240,7 +286,7 @@ def compute_landsberg(rue, sIndex_bati, features_bati, nom_hauteur):
             intervalles01 = intervalles
         else:
             intervalles11 = intervalles
-
+        """
     #selection des batiments sur chaque intervalle ou 2 se font face
     intervalles02 = gestion_distance(intervalles01)
     intervalles12 = gestion_distance(intervalles11)
@@ -248,10 +294,21 @@ def compute_landsberg(rue, sIndex_bati, features_bati, nom_hauteur):
 
     #calcul de l'indicateur sur chaque intervalle ou 2 batiments se font face
     landsberg = 0
+    som_int = 0
+    for i in intervalles2 :
+        hauteur1 = features_bati[i[0][0]].attribute(nom_hauteur)
+        hauteur2 = features_bati[i[0][1]].attribute(nom_hauteur)
+        hauteur_moy = (hauteur1 + hauteur2)/2.
+        som_int += i[1][1]-i[1][0]
+        landsberg += (i[1][1]-i[1][0])*hauteur_moy/i[2]
+    if som_int > 0:
+        landsberg = landsberg / som_int
+    """
     for i in intervalles2 :
         hauteur = features_bati[i[0]].attribute(nom_hauteur)
         landsberg += (intervalles2[1][1]-intervalles2[1][0])*hauteur/i[2]
     landsberg = landsberg / som_int
+    """
     return landsberg
 
 def standard_deviation(l):

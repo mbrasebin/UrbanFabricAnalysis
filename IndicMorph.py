@@ -180,8 +180,13 @@ class IndicateursMorpho:
                 action)
             self.iface.removeToolBarIcon(action)
         # remove the toolbar
-        del self.toolbar
+        del self.toolbar        
 
+    def selectItem(self, dialog, text):
+        for i in range(0,dialog.count()):
+            if text in dialog.itemText(i):
+                dialog.setCurrentIndex(i)
+    
     def run(self):
         """Run method that performs all the real work"""
         self.dlg.bati.clear()
@@ -195,6 +200,11 @@ class IndicateursMorpho:
             self.dlg.routes.addItem(layer.name(),layer)
             self.dlg.vegetation.addItem(layer.name(),layer)
             self.dlg.iris.addItem(layer.name(),layer)
+        #prelect layers (just to save some time)
+        self.selectItem(self.dlg.bati,"BATI")
+        self.selectItem(self.dlg.routes,"ROUTE")
+        self.selectItem(self.dlg.vegetation,"VEGETATION")
+        self.selectItem(self.dlg.iris,"IRIS")
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
@@ -426,7 +436,6 @@ class IndicateursMorpho:
                     veg_density_dict[element[0]].append(element[1])
                 i += 1
                 progress.setValue(i)
-
 
             progressMessageBar = self.iface.messageBar().createMessage("Handling roads")
             progress.reset()
