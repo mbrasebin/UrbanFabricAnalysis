@@ -8,7 +8,7 @@
 
 [general]
 name=Indicateurs morphologiques
-qgisMinimumVersion=2.0
+qgisMinimumVersion=3.0
 description=descr
 version=0.1
 author=moi
