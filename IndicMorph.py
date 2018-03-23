@@ -28,11 +28,10 @@ from .resources import *
 # Import the code for the dialog
 from .IndicMorph_dialog import IndicateursMorphoDialog
 import os.path
-import math
 from qgis.core import QgsVectorLayer, QgsFeature, QgsSpatialIndex, QgsVectorFileWriter, QgsProject
-from qgis.core import QgsFeatureRequest, QgsField, QgsGeometry, QgsPoint, QgsRectangle, QgsPointXY
-
-
+from qgis.core import QgsFeatureRequest, QgsField, QgsGeometry, QgsPoint, QgsRectangle
+from .morpho import *
+from statistics import *
 
 class IndicateursMorpho:
     """QGIS Plugin Implementation."""
@@ -173,7 +172,6 @@ class IndicateursMorpho:
             callback=self.run,
             parent=self.iface.mainWindow())
 
-
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
@@ -182,344 +180,19 @@ class IndicateursMorpho:
                 action)
             self.iface.removeToolBarIcon(action)
         # remove the toolbar
-        del self.toolbar
+        del self.toolbar        
 
-
-    """
-    Méthode de calcul du SMBR.
-    """
-
-    def normalizedAngle(self,  angle):
-        clippedAngle = angle
-        if ( clippedAngle >= math.pi * 2 or clippedAngle <= -2 * math.pi ):
-            clippedAngle = math.fmod( clippedAngle, 2 * math.pi)
-        if ( clippedAngle < 0.0 ):
-            clippedAngle += 2 * math.pi
-        return clippedAngle
-
-    def lineAngle(self, x1, y1, x2, y2):
-        at = math.atan2( y2 - y1, x2 - x1 )
-        a = -at + math.pi / 2.0
-        return self.normalizedAngle( a )
-
-    def compute_SMBR(self, geom):
-        area = float("inf")
-        angle = 0
-        width = float("inf")
-        height =  float("inf")
-        
-        if (geom is None):
-            return  QgsGeometry()
- 
-        hull = geom.convexHull()
-        if ( hull.isEmpty() ):
-            return QgsGeometry()
-        x = hull.asPolygon()
-        vertexId = 0
-        pt0 = x[0][vertexId]
-        pt1 = pt0
-        prevAngle = 0.0
-        size = len(x[0])
-        for vertexId in range(0,  size-0):
-            pt2 = x[0][vertexId]
-            currentAngle = self.lineAngle( pt1.x(), pt1.y(), pt2.x(), pt2.y() )
-            rotateAngle = 180.0 / math.pi *  (currentAngle - prevAngle)
-            prevAngle = currentAngle
-            
-            t = QTransform.fromTranslate( pt0.x(), pt0.y() )
-            t.rotate(rotateAngle)
-            t.translate( -pt0.x(), -pt0.y() )
-            hull.transform(t)
-            
-            bounds = hull.boundingBox()
-            currentArea = bounds.width() * bounds.height()
-            if ( currentArea  < area ):
-                minRect = bounds
-                area = currentArea
-                angle = 180.0 / math.pi * currentAngle
-                width = bounds.width()
-                height = bounds.height()
-            pt2 = pt1
-        minBounds = QgsGeometry.fromRect( minRect )
-        minBounds.rotate( angle, QgsPointXY( pt0.x(), pt0.y() ) )
-        if ( angle > 180.0 ):
-            angle = math.fmod( angle, 180.0 )
-        return minBounds, area, angle, width, height
-
-    def addListe(self, l, i, n):
-        if i == len(l):
-            return l + [n]
-        elif n < l[i] :
-            return l[0:i]+[n]+l[i:len(l)]
-        elif n > l[i] :
-            return self.addListe(l,i+1,n)
-        else:
-            return l
-
-    def findIndex(self,l,n):
-        i = 0
-        j = len(l)-1
-        while i <= j :
-            k = l[(i+j)/2]
-            if k == n:
-                return (i+j)/2
-            elif k > n:
-                j = (j+i)/2-1
-            else :
-                i = (j+i)/2+1
-        if i>j:
-            return 0
-
-    def findIRIS_areas(self,geom,layer_IRIS,nom_idIRIS):
-        intersections = []
-        for iris in layer_IRIS.getFeatures():
-            if iris.geometry().intersects(geom):
-                intersections.append([iris.attribute(nom_idIRIS),iris.geometry().intersection(geom).area()])
-        return intersections
-
-    def findIRIS_line(self,geom,layer_IRIS,nom_idIRIS):
-        intersections = []
-        for iris in layer_IRIS.getFeatures():
-            if iris.geometry().intersects(geom):
-                intersections.append([iris.attribute(nom_idIRIS),iris.geometry().intersection(geom).length()])
-        iris_id = 0
-        length_max = 0
-        for element in intersections:
-            if element[1]>length_max:
-                iris_id = element[0]
-                length_max = element[1]
-        return iris_id
-
-    def findIRIS(self,geom,layer_IRIS,nom_idIRIS):
-        intersections = self.findIRIS_areas(geom,layer_IRIS,nom_idIRIS)
-        iris_id = 0
-        aire_max = 0
-        for element in intersections:
-            if element[1]>aire_max:
-                iris_id = element[0]
-                aire_max = element[1]
-        return iris_id
-
-    def compute_elongation(self, d1, d2):
-        """
-        Calcul de l'élongation.
-        """
-        elongation = min(d1,d2)/max(d1,d2)
-        return elongation
-
-    def compute_compactness(self, area, perimeter):
-        """
-        Calcul de la compacité.
-        """
-        return 4 * math.pi * area / (perimeter * perimeter)
+    def selectItem(self, dialog, text):
+        for i in range(0,dialog.count()):
+            if text in dialog.itemText(i):
+                dialog.setCurrentIndex(i)
     
-    def compute_convexity1(self, geom, area):
-        """
-        Calcul de la convexité selon l'enveloppe convexe.
-        """
-        convexhull = geom.convexHull()
-        convexity1 = area/convexhull.area()
-        return convexity1
-        
-    def compute_convexity2(self, area, SMBR_area):
-        """
-        Calcul de la convexité selon le SMBR.
-        """
-        convexity2 = area/SMBR_area	
-        return convexity2
-
-    def compute_formFactor(self, hauteur, SMBR_width, SMBR_height):
-        """
-        Calcul du facteur de forme
-        """
-        formFactor = hauteur * 2 / (SMBR_width + SMBR_height)
-        return formFactor
-
-    def compute_formIndice(self, hauteur, area):
-        """
-        Calcul de l'indice de forme
-        """
-        formIndice = hauteur**2 / area
-        return formIndice
-
-    def gestion_cotes_rec(self, ret, intervalle, intervalles12):
-        if intervalles12 == [] or intervalle[1][1]<intervalles12[0][1][0]:
-            return ret
-        elif intervalle[1][0]>intervalles12[0][1][1]:
-            return self.gestion_cotes_rec(ret, intervalle, intervalles12[1:])
-        else:
-            ret += [[intervalle[0],intervalles12[0][0]],[max(intervalle[1][0],intervalles12[0][1][0]),min(intervalle[1][1],intervalles12[0][1][1])],intervalle[2]+intervalles12[0][2]]
-            return self.gestion_cotes_rec(ret, intervalle, intervalles12[1:])
-        
-
-    def gestion_cotes(self, intervalles11, intervalles12):
-        res = []
-        for i in intervalles11:
-            res += self.gestion_cotes_rec([],i,intervalles12)
-        return res
-        
-
-    def fusionI(self, a_traiter, i):
-        #renvoie une liste des batiments les plus proches de la rue d'un cote donne pour chaque abscisse de l'intervalle i par rapport a l'ajout de i_new
-
-        #le batiment a_traiter est plus eloigne que le batiment i
-        if i[2] <= a_traiter:
-            return [i]
-        else:
-        
-            #les 2 intervalles s'intersectent
-            if a_traiter[1][0] < i[1][1] and a_traiter[1][1] > i[1][0]:
-                inter = [max(i[1][0],a_traiter[1][0]),min(i[1][1],a_traiter[1][1])]
-                pInf = [i[1][0],inter[0]]
-                pSup = [i[1][1],inter[1]]
-                if pInf[0]==pInf[1] and pSup[0]==pSup[1]:
-                    return [inter]
-                elif pInf[0]!=pInf[1] and pSup[0]==pSup[1]:
-                    return [inter,pInf]
-                elif pInf[0]==pInf[1] and pSup[0]!=pSup[1]:
-                    return [inter,pSup]
-                else:
-                    return [inter,pInf,pSup]
-            
-            #pas d'intersection, le batiment a_traiter ne donne pas sur l'intervalle du batiment i
-            else:
-                return [i]
-
-
-    def gestion_dist_rec(self,i_new,intervalles):
-        #ajoute un intervalle i_new a l'ensemble des intervalles d'un cote donnant le batiment le plus proche de la rue pour ces abscisses
-        if intervalles == []:
-            return [i_new]
-        else:
-            i = intervalles[0]
-            #gestion recursive de l'eventuelle partie de i_new situee avant l'intervalle i
-            if i_new[1][0] < i[1][0]:
-                intervalles = [i]+self.gestion_dist_rec([i_new[0],[i_new[1][0],min(i[1][0],i_new[1][1])],i_new[2]],intervalles[1:])
-            #gestion recursive de l'eventuelle partie de i_new situee apres l'intervalle i
-            if i_new[1][1] > i[1][1]:
-                intervalles = [i]+self.gestion_dist_rec([i_new[0],[i_new[1][0],max(i[1][0],i_new[1][1])],i_new[2]],intervalles[1:])
-            #gestion de l'intervalle i
-            l_rempIn = self.fusionI(i_new,i)
-            return l_rempIn+intervalles[1:]
-
-    
-
-    def gestion_distance(self, intervalles1):
-        #ne conserve pour chaque partie de la rue que le batiment le plus proche d'un cote donne
-        intervalles2=[]
-        #on considere successivement les differents intervalles de inttervalles1 en faisant evoluer intervalles2
-        for i_new in intervalles1:
-            intervalles2 = self.gestion_dist_rec(i_new,intervalles2)
-        return intervalles2
-
-    def compute_landsberg(self, rue, sIndex_bati, features_bati, nom_hauteur):
-        #calcule l'indicateur de landsberg pour la rue
-    
-        #selection des batiments proches de la rue de chaque cote
-        b_rue = rue.geometry().singleSidedBuffer(500,7,QgsGeometry.SideLeft)
-        b_rue2 = rue.geometry().singleSidedBuffer(500,7,QgsGeometry.SideRight)
-        buffers_rue = [b_rue,b_rue2]
-        gdbuff_rue = b_rue.combine(b_rue2)
-        batis_id = sIndex_bati.intersects(gdbuff_rue.boundingBox())
-        print(batis_id)
-        batis_id_2c = [[],[]]
-        for bati_id in batis_id:
-            if features_bati[bati_id].geometry().intersects(b_rue):
-                batis_id_2c[0] += bati_id
-            elif features_bati[bati_id].geometry().intersects(b_rue2):
-                batis_id_2c[1] += bati_id
-        #calcul de la projection de chaque batiment sur la rue pour chaque cote
-        for i in [0,1]:
-            buff_rue = buffers_rue[i]
-            voisinage = batis_id_2c[i]
-            intervalles = []
-            for voisin_id in voisinage:
-                voisin = features_bati[voisin_id]
-                init = False
-                intervalles = []
-                for point in voisin.geometry().asPolygon()[0]:
-                    x = rue.geometry().lineLocatePoint(point)
-                    if not init:
-                        mini = x
-                        maxi = x
-                        init = True
-                    else:
-                        mini = min(x,mini)
-                        maxi = max(x,maxi)
-                disR = voisin.distance(rue)
-                intervalles += [voisin_id,[mini,maxi],disR]
-            if i == 0:
-                intervalles01 = intervalles
-            else:
-                intervalles11 = intervalles
-
-        #selection des batiments sur chaque intervalle ou 2 se font face
-        intervalles02 = self.gestion_distance(intervalles01)
-        intervalles12 = self.gestion_distance(intervalles11)
-        intervalles2 = self.gestion_cotes(intervalles11,intervalles12)
-
-        #calcul de l'indicateur sur chaque intervalle ou 2 batiments se font face
-        landsberg = 0
-        som_int = 0
-        for i in intervalles2 :
-            hauteur1 = features_bati[i[0][0]].attribute(nom_hauteur)
-            hauteur2 = features_bati[i[0][1]].attribute(nom_hauteur)
-            hauteur_moy = (hauteur1 + hauteur2)/2.
-            som_int += i[1][1]-i[1][0]
-            landsberg += (i[1][1]-i[1][0])*hauteur_moy/i[2]
-        if som_int > 0:
-            landsberg = landsberg / som_int
-        return landsberg
-    
-    def moyenne(self, l):
-        if l == []:
-            return "-"
-        m = 0.0
-        for i in l:
-            m += i
-        m = m/len(l)
-        return m
-
-    def variance(self, l):
-        if l == []:
-            return "-"
-        m = self.moyenne(l)
-        s = 0.0
-        for i in l:
-            s += i*i
-        return s/len(l)-m*m
-
-    def ecart_type(self, l):
-        if l == []:
-            return "-"
-        return math.sqrt(self.variance(l))
-
-    def mediane(self,l):
-        if l == []:
-            return "-"
-        n = len(l)
-        t = sorted(l)
-        return t[n/2]
-
-    def deciles(self,l):
-        if l == []:
-            return "-"
-        n = len(l)
-        t = sorted(l)
-        dec = [0 for i in range(9)]
-        for i in range(1,10):
-            dec[i-1]=t[i*n/10]
-        return dec
-    
-
     def run(self):
         """Run method that performs all the real work"""
-
         self.dlg.bati.clear()
         self.dlg.routes.clear()
         self.dlg.vegetation.clear()
         self.dlg.iris.clear()
-
         #set the couche combobox items
         layers = QgsProject.instance().mapLayers().values()
         for layer in layers:
@@ -527,21 +200,18 @@ class IndicateursMorpho:
             self.dlg.routes.addItem(layer.name(),layer)
             self.dlg.vegetation.addItem(layer.name(),layer)
             self.dlg.iris.addItem(layer.name(),layer)
-
-        
-
-
+        #prelect layers (just to save some time)
+        self.selectItem(self.dlg.bati,"BATI")
+        self.selectItem(self.dlg.routes,"ROUTE")
+        self.selectItem(self.dlg.vegetation,"VEGETATION")
+        self.selectItem(self.dlg.iris,"IRIS")
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
-        
         # See if OK was pressed
         if result:
-
-
             print("Bravo")
-            
             #get the index of the combobox
             indexBati = self.dlg.bati.currentIndex()
             indexRoutes = self.dlg.routes.currentIndex()
@@ -552,70 +222,73 @@ class IndicateursMorpho:
             features_road = {RFeature.id(): RFeature for RFeature in layer_routes.getFeatures()}
             layer_vegetation = self.dlg.vegetation.itemData(indexVegetation)
             layer_IRIS = self.dlg.iris.itemData(indexIRIS)
-
-            
-
-
             #definition des attributs utiles
             #HauteurBatiments
+            """            
             bati_attributes = [layer_bati.attributeDisplayName(i) for i in layer_bati.attributeList()]
-            h_cmbBox = QComboBox()
-            h_cmbBox.show()
+            h_cmbBox = QComboBox(self.iface.mainWindow())
             for a in bati_attributes:
                 h_cmbBox.addItem(a)
+            h_cmbBox.show()
             h_cmbBox.showPopup()
             QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","Hauteur Batiment")
-            nom_hauteur = h_cmbBox.currentText()
-
+            height_name = h_cmbBox.currentText()
+            self.iface.messageBar().pushMessage(height_name)
             #ID Batiments
             bid_cmbBox = QComboBox()
-            bid_cmbBox.show()
+#            bid_cmbBox.show()
             for a in bati_attributes:
                 bid_cmbBox.addItem(a)
             bid_cmbBox.showPopup()
             QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","ID Batiment")
-            nom_idBati = bid_cmbBox.currentText()
+            building_id_name = bid_cmbBox.currentText()
 
             #ID IRIS
             iris_attributes = [layer_IRIS.attributeDisplayName(i) for i in layer_IRIS.attributeList()]
             iris_cmbBox = QComboBox()
-            iris_cmbBox.show()
+#            iris_cmbBox.show()
             for a in iris_attributes:
                 iris_cmbBox.addItem(a)
             iris_cmbBox.showPopup()
             QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","ID IRIS")
-            nom_idIRIS = iris_cmbBox.currentText()
+            IRIS_id_name = iris_cmbBox.currentText()
             
             #Importance Routes
             routes_attributes = [layer_routes.attributeDisplayName(i) for i in layer_routes.attributeList()]
             imp_cmbBox = QComboBox()
-            imp_cmbBox.show()
+#            imp_cmbBox.show()
             for a in routes_attributes:
                 imp_cmbBox.addItem(a)
             imp_cmbBox.showPopup()
             QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","Importance des routes")
-            nom_importance = imp_cmbBox.currentText()
+            importance_name = imp_cmbBox.currentText()
             
             #Largeur Routes
             larg_cmbBox = QComboBox()
-            larg_cmbBox.show()
+#            larg_cmbBox.show()
             for a in routes_attributes:
                 larg_cmbBox.addItem(a)
             larg_cmbBox.showPopup()
             QMessageBox.information(self.iface.mainWindow(),"Choix de l'attribut","Largeur des routes")
-            nom_largeur = larg_cmbBox.currentText()
+            width_name = larg_cmbBox.currentText()
+            """
+            IRIS_id_name = "DCOMIRIS"
+            routes_id_name = "ID"
+            importance_name = "IMPORTANCE"
+            width_name = "LARGEUR"
+            building_id_name = "ID"
+            height_name = "HAUTEUR"
             
-            liste_IRIS = {IFeature.attribute(nom_idIRIS) : IFeature for IFeature in layer_IRIS.getFeatures()}
+            liste_IRIS = {IFeature.attribute(IRIS_id_name) : IFeature for IFeature in layer_IRIS.getFeatures()}
             liste_IRISBatis = []
-            features_bati = {BFeature.id() : BFeature for BFeature in layer_bati.getFeatures()}
+            features_bati = {BFeature.attribute(building_id_name) : BFeature for BFeature in layer_bati.getFeatures()}
             """
             #dict
             liste_IRIS = []
             for f in layer_IRIS.getFeatures():
-                n=f.attribute(nom_idIRIS)
+                n=f.attribute(IRIS_id_name)
                 liste_IRIS = self.addListe(liste_IRIS,0,int(n))
             """            
-
 
             # create layer
             vl = QgsVectorLayer("Polygon", layer_bati.name(), "memory")
@@ -642,19 +315,18 @@ class IndicateursMorpho:
                 QgsField("distToRoad",QVariant.Double),
                 QgsField("complexity",QVariant.Double),
                 QgsField("formFactor", QVariant.Double),
+#                QgsField("SMBR_angle_90", QVariant.Double)]
                 QgsField("formIndice",QVariant.Double),
                 QgsField("nearRoad",QVariant.String)]
 
-            #create spatial index
+            #create spatial indexes
+            index_routes = QgsSpatialIndex()
+            for f in layer_routes.getFeatures(): index_routes.insertFeature(f)
+            index_bati = QgsSpatialIndex()
+            for f in layer_bati.getFeatures(): index_bati.insertFeature(f)
+            index_IRIS = QgsSpatialIndex()
+            for f in layer_IRIS.getFeatures(): index_IRIS.insertFeature(f)
 
-            SIndex_routes = QgsSpatialIndex()
-            for feat_route in layer_routes.getFeatures():
-                SIndex_routes.insertFeature(feat_route)
-
-            SIndex_bati = QgsSpatialIndex()
-            for feat_bati in layer_bati.getFeatures():
-                SIndex_bati.insertFeature(feat_route)
-            
             # add the new measures to the features
             pr.addAttributes( fields )
             vl.updateFields()
@@ -666,137 +338,59 @@ class IndicateursMorpho:
             progressMessageBar.layout().addWidget(progress)
             self.iface.messageBar().pushWidget(progressMessageBar, self.iface.messageBar().INFO)
 
-            """
-            #dict
-            areas = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
-            volumes = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
-            elongations = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
-            featureList = []
-            featureListBis = []
-            area_perimeters = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
-            dens_batie = [0 for j in range(len(liste_IRIS))]
-            distToRoads = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
-            dens_vegetale = [0 for j in range(len(liste_IRIS))]
-            complexities = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
-            formFactors = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
-            formIndices = [[liste_IRIS[j],[]] for j in range(len(liste_IRIS))]
-            """
+            # Create dictionaries of all features
+            IRIS_dict = {f.id(): f for f in layer_IRIS.getFeatures()}
+            routes_dict = {f.id(): f for f in layer_routes.getFeatures()}
+            building_dict = {f.id(): f for f in layer_bati.getFeatures()}
+            area_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            elongation_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            area_perimeter_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            volume_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            density_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            distance_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            complexity_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            form_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            form_index_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
 
-            areas = {}
-            volumes = {}
-            elongations = {}
+            veg_density_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+            landsberg_dict = {f.attribute(IRIS_id_name): [] for f in layer_IRIS.getFeatures()}
+
             featureList = []
-            featureListBis = []
-            area_perimeters = {}
-            dens_batie = {}
-            distToRoads = {}
-            dens_vegetale = {}
-            complexities = {}
-            formFactors = {}
-            formIndices = {}
-            landsberg = {}
-            
-                        
-            
-            i = 0
-            
+            i = 0            
             # add features
             for f in layer_bati.getFeatures():
                 geom = f.geometry()
                 area = geom.area()
                 perimeter = geom.length()
-                hauteur = f.attribute(nom_hauteur)
+                hauteur = f.attribute(height_name)
                 #99
-                ident = f.attribute(nom_idBati)
+                ident = f.attribute(building_id_name)
 
                 #recherche de l'IRIS du batiment
-                iris_id = self.findIRIS(geom,layer_IRIS,nom_idIRIS)
-
-                """
-                #dict
-                if iris_id != 0:
-                    index_iris = self.findIndex(liste_IRIS,int(iris_id))
-                """
+                iris_id = find(geom,index_IRIS,IRIS_dict,IRIS_id_name)
 
                 #calcul des indicateurs a l'echelle du batiment
+                distToRoadMin, nRoad = distance_from_polygon_to_layer(geom, index_routes, routes_dict, routes_id_name)
 
-
-                roadList = []
-                dist = 0
-                while roadList == [] and dist < 20000:
-                    dist += 300
-                    zone = geom.buffer(dist,10).boundingBox()
-                    roadList = SIndex_routes.intersects(zone)
-                distToRoadMin = -1
-                for f_road_id in roadList:
-                    f_road = features_road[f_road_id]
-                    distToRoad = f_road.geometry().distance(geom)
-                    if distToRoadMin == -1:
-                        distToRoadMin = distToRoad
-                        #99
-                        nRoad = f_road.attribute(nom_idBati)
-                    elif(distToRoad<distToRoadMin):
-                        distToRoadMin = distToRoad
-                        #99
-                        nRoad = f_road.attribute(nom_idBati)
-                
-                """
-                nearestRoad = SIndex_routes.nearestNeighbor(geom.centroid().asPoint(),1)
-                for road in layer_routes.getFeatures():
-                    if road.id() == nearestRoad[0]:
-                        nRoad = road
-                distToRoadMin = nRoad.geometry().distance(geom)
-                """
-
-                """
-                distToRoadMin = -1
-                for f_road in layer_routes.getFeatures():
-                    distToRoad = f_road.geometry().distance(geom)
-                    if distToRoadMin == -1:
-                        distToRoadMin = distToRoad
-                    else:
-                        distToRoadMin = min(distToRoad,distToRoadMin)
-                """
-                        
-                param_SMBR = self.compute_SMBR(geom)
-                SMBR_geom = param_SMBR[0]
-                SMBR_area = param_SMBR[1]
-                SMBR_angle = param_SMBR[2]
-                SMBR_width = param_SMBR[3]
-                SMBR_height = param_SMBR[4]
-                convexity1 = self.compute_convexity1(geom, area)
-                convexity2 = self.compute_convexity2(area, SMBR_area)
-                elongation = self.compute_elongation(SMBR_height, SMBR_width)
-                compactness = self.compute_compactness(area, perimeter)
+                SMBR_geom, SMBR_area, SMBR_angle, SMBR_width, SMBR_height = geom.orientedMinimumBoundingBox()
+                convexity1 = compute_convexity1(geom, area)
+                convexity2 = compute_convexity2(area, SMBR_area)
+                elongation = compute_elongation(SMBR_height, SMBR_width)
+                compactness = compute_compactness(area, perimeter)
                 complexity = len(geom.asPolygon()[0]) - 1
-                formFactor = self.compute_formFactor(hauteur, SMBR_width, SMBR_height)
-                formIndice = self.compute_formIndice(hauteur, area)
+                formFactor = compute_formFactor(hauteur, SMBR_width, SMBR_height)
+                formIndice = compute_formIndice(hauteur, area)
                 #remplissage des listes pour les calculs a l'echelle de l'IRIS
-                if iris_id in liste_IRISBatis:
-                    elongations[iris_id] += [elongation]
-                    area_perimeters[iris_id] += [area/perimeter]
-                    areas[iris_id] += [area]
-                    volumes[iris_id] += [area * hauteur]
-                    dens_batie[iris_id] += area*(hauteur*5/2)
-                    if distToRoadMin >= 0:
-                        distToRoads[iris_id] += [distToRoadMin]
-                    complexities[iris_id] += [complexity]
-                    formFactors[iris_id] += [formFactor]
-                    formIndices[iris_id] += [formIndice]
-                else:
-                    liste_IRISBatis += [iris_id]
-                    elongations[iris_id] = [elongation]
-                    area_perimeters[iris_id] = [area/perimeter]
-                    areas[iris_id] = [area]
-                    volumes[iris_id] = [area * hauteur]
-                    dens_batie[iris_id] = area*(hauteur*5/2)
-                    if distToRoadMin >= 0:
-                        distToRoads[iris_id] = [distToRoadMin]
-                    complexities[iris_id] = [complexity]
-                    formFactors[iris_id] = [formFactor]
-                    formIndices[iris_id] = [formIndice]
-                    dens_vegetale[iris_id] = 0
-                    landsberg[iris_id] = []
+                if iris_id != 0:
+                    elongation_dict[iris_id].append(elongation)
+                    area_perimeter_dict[iris_id].append(area/perimeter)
+                    area_dict[iris_id].append(area)
+                    volume_dict[iris_id].append(area * hauteur)
+                    density_dict[iris_id].append(area*(hauteur*5/2))
+                    distance_dict[iris_id].append(distToRoadMin)
+                    complexity_dict[iris_id].append(complexity)
+                    form_dict[iris_id].append(formFactor)
+                    form_index_dict[iris_id].append(formIndice)
 
                 feat = QgsFeature()
                 feat.setGeometry( geom )
@@ -819,6 +413,7 @@ class IndicateursMorpho:
                     feat.setAttribute( 13, distToRoadMin)
                 feat.setAttribute( 14, complexity)
                 feat.setAttribute( 15, formFactor)
+                #feat.setAttribute( 17, SMBR_angle%90)
                 feat.setAttribute( 16, formIndice)
                 #99
                 feat.setAttribute(17, nRoad)
@@ -829,20 +424,29 @@ class IndicateursMorpho:
             pr.addFeatures (featureList)
             vl.commitChanges()
 
+            progressMessageBar = self.iface.messageBar().createMessage("Handling vegetation")
+            progress.reset()
+            progress.setMaximum(layer_vegetation.featureCount())
+            i = 0
             for fVeget in layer_vegetation.getFeatures():
                 geomV = fVeget.geometry()
-                areaV = geomV.area()
-                iris_areasV = self.findIRIS_areas(geomV,layer_IRIS,nom_idIRIS)
+                #areaV = geomV.area()
+                iris_areasV = find_areas(geomV,index_IRIS,IRIS_dict,IRIS_id_name)
                 for element in iris_areasV:
-                    if element[0] in dens_vegetale:
-                        dens_vegetale[element[0]] += element[1]
+                    veg_density_dict[element[0]].append(element[1])
+                i += 1
+                progress.setValue(i)
 
+            progressMessageBar = self.iface.messageBar().createMessage("Handling roads")
+            progress.reset()
+            progress.setMaximum(layer_routes.featureCount())
+            i = 0
             for fRoad in layer_routes.getFeatures():
-                iris_r = self.findIRIS_line(fRoad.geometry(),layer_IRIS,nom_idIRIS)
-                if iris_r in landsberg:
-                    landsberg[iris_r] += [self.compute_landsberg(fRoad,SIndex_bati,features_bati,nom_hauteur)]
+                iris_r = findIRIS_line(fRoad.geometry(),layer_IRIS,IRIS_id_name)
+                landsberg_dict[iris_r].append(compute_landsberg(fRoad,index_bati,building_dict,height_name))
+                i += 1
+                progress.setValue(i)
                 
-
             # create layer iris
             irisBis = QgsVectorLayer("Polygon", layer_IRIS.name(), "memory")
             prBis = irisBis.dataProvider()
@@ -857,29 +461,29 @@ class IndicateursMorpho:
                 QgsField("area_med", QVariant.Double),
                 QgsField("area_moy", QVariant.Double),
                 QgsField("area_ect", QVariant.Double),
-                QgsField("area_dec", QVariant.Double),
+                QgsField("area_dec", QVariant.String),
                 QgsField("volume_med",QVariant.Double),
                 QgsField("volume_moy",QVariant.Double),
                 QgsField("volume_ect",QVariant.Double),
                 QgsField("elong_med", QVariant.Double),
                 QgsField("elong_moy", QVariant.Double),
                 QgsField("elong_ect", QVariant.Double),
-                QgsField("elong_dec", QVariant.Double),
+                QgsField("elong_dec", QVariant.String),
                 QgsField("areaper_med", QVariant.Double),
                 QgsField("areaper_moy", QVariant.Double),
                 QgsField("areaper_ect", QVariant.Double),
-                QgsField("areaper_dec", QVariant.Double),
+                QgsField("areaper_dec", QVariant.String),
                 QgsField("ces",QVariant.Double),
                 QgsField("dens_batie", QVariant.Double),
                 QgsField("dsRoad_med",QVariant.Double),
                 QgsField("dsRoad_moy",QVariant.Double),
                 QgsField("dsRoad_ect",QVariant.Double),
-                QgsField("dsRoad_dec",QVariant.Double),
+                QgsField("dsRoad_dec",QVariant.String),
                 QgsField("dens_veget",QVariant.Double),
                 QgsField("compl_med",QVariant.Double),
                 QgsField("compl_moy",QVariant.Double),
                 QgsField("compl_ect",QVariant.Double),
-                QgsField("compl_dec",QVariant.Double),
+                QgsField("compl_dec",QVariant.String),
                 QgsField("formF_med",QVariant.Double),
                 QgsField("formF_moy",QVariant.Double),
                 QgsField("formF_ect",QVariant.Double),
@@ -896,94 +500,72 @@ class IndicateursMorpho:
             prBis.addAttributes( fieldsBis )
             irisBis.updateFields()
 
-            for irisID in liste_IRISBatis:
-                featIRIS = liste_IRIS[irisID]
+            featureListBis = []
+            for featIRIS in layer_IRIS.getFeatures():
                 geomI = featIRIS.geometry()
                 areaI = geomI.area()
-                ID = featIRIS.attribute(nom_idIRIS)
-                #dict   indexI = self.findIndex(liste_IRIS,int(ID))
-                areasI = areas[ID]
-                volumesI = volumes[ID]
-                elongationsI = elongations[ID]
-                area_perimetersI = area_perimeters[ID]
-                nb_batiments = len(areas[ID])
+                ID = featIRIS.attribute(IRIS_id_name)
+                areasI = area_dict[ID]
+                volumesI = volume_dict[ID]
+                elongationsI = elongation_dict[ID]
+                area_perimetersI = area_perimeter_dict[ID]
+                nb_batiments = len(areasI)
                 sum_areas = sum(areasI)
-                distToRoadsI = distToRoads[ID]
-                dens_vegetaleI = dens_vegetale[ID]
-                complexitiesI = complexities[ID]
-                formFactorsI = formFactors[ID]
-                formIndicesI = formIndices[ID]
-                landsbergI = landsberg[ID]
+                distToRoadsI = distance_dict[ID]
+                densityI = density_dict[ID]
+                dens_vegetaleI = veg_density_dict[ID]
+                complexitiesI = complexity_dict[ID]
+                formFactorsI = form_dict[ID]
+                formIndicesI = form_index_dict[ID]
+                landsbergI = landsberg_dict[ID]
 
-                if nb_batiments > 0:
-                    print(ID)
-                    print("Area")
-                    print(self.deciles(areasI))
-                    print("Volume")
-                    print(self.deciles(volumesI))
-                    print("Elongation")
-                    print(self.deciles(elongationsI))
-                    print("Area / perimeter")
-                    print(self.deciles(area_perimetersI))
-                    print("Distance to road")
-                    print(self.deciles(distToRoadsI))
-                    print("Complexity")
-                    print(self.deciles(complexitiesI))
-                    print("Form factor")
-                    print(self.deciles(formFactorsI))
-
-            
                 feat = QgsFeature()
                 feat.setGeometry( geomI )
                 feat.initAttributes(len(fieldsBis))
                 feat.setAttribute( 0, ID )
                 feat.setAttribute( 1, nb_batiments )
                 if nb_batiments > 0:
-                    feat.setAttribute( 2, self.mediane(areasI) )
-                    feat.setAttribute( 3, self.moyenne(areasI) )
-                    feat.setAttribute( 4, self.ecart_type(areasI) )
-                    #feat.setAttribute( 5, self.deciles(areasI) )
-                    feat.setAttribute( 6, self.mediane(volumesI))
-                    feat.setAttribute( 7, self.moyenne(volumesI))
-                    feat.setAttribute( 8, self.ecart_type(volumesI))
-                    feat.setAttribute( 9, self.mediane(elongationsI) )
-                    feat.setAttribute( 10, self.moyenne(elongationsI) )
-                    feat.setAttribute( 11, self.ecart_type(elongationsI))
-                    #feat.setAttribute( 12, self.deciles(elongationsI) )
-                    feat.setAttribute( 13, self.mediane(area_perimetersI))
-                    feat.setAttribute( 14, self.moyenne(area_perimetersI))
-                    feat.setAttribute( 15, self.ecart_type(area_perimetersI))
-                    #feat.setAttribute( 16, self.deciles(area_perimetersI))
+                    feat.setAttribute( 2, median(areasI) )
+                    feat.setAttribute( 3, mean(areasI) )
+                    feat.setAttribute( 4, standard_deviation(areasI) )
+                    feat.setAttribute( 5, deciles_as_str(areasI))
+                    feat.setAttribute( 6, median(volumesI))
+                    feat.setAttribute( 7, mean(volumesI))
+                    feat.setAttribute( 8, standard_deviation(volumesI))
+                    feat.setAttribute( 9, median(elongationsI) )
+                    feat.setAttribute( 10, mean(elongationsI) )
+                    feat.setAttribute( 11, standard_deviation(elongationsI))
+                    feat.setAttribute( 12, deciles_as_str(elongationsI))
+                    feat.setAttribute( 13, median(area_perimetersI))
+                    feat.setAttribute( 14, mean(area_perimetersI))
+                    feat.setAttribute( 15, standard_deviation(area_perimetersI))
+                    feat.setAttribute( 16, deciles_as_str(area_perimetersI))
                     feat.setAttribute( 17, sum_areas / areaI)
-                    feat.setAttribute( 18, dens_batie[ID]/areaI)
-                    feat.setAttribute( 19, self.mediane(distToRoadsI))
-                    feat.setAttribute( 20, self.moyenne(distToRoadsI))
-                    feat.setAttribute( 21, self.ecart_type(distToRoadsI))
-                    #feat.setAttribute( 22, self.deciles(distToRoadsI))
-                    feat.setAttribute( 23, dens_vegetaleI / areaI)
-                    feat.setAttribute( 24, self.mediane(complexitiesI))
-                    feat.setAttribute( 25, self.moyenne(complexitiesI))
-                    feat.setAttribute( 26, self.ecart_type(complexitiesI))
-                    #feat.setAttribute( 27, self.deciles(complexitiesI))
-                    feat.setAttribute( 28, self.mediane(formFactorsI))
-                    feat.setAttribute( 29, self.moyenne(formFactorsI))
-                    feat.setAttribute( 30, self.ecart_type(formFactorsI))
-                    #feat.setAttribute( 31, self.deciles(formFactorsI))
-                    feat.setAttribute( 32, self.mediane(formIndicesI))
-                    feat.setAttribute( 33, self.moyenne(formIndicesI))
-                    feat.setAttribute( 34, self.ecart_type(formIndicesI))
-                    feat.setAttribute( 35, self.mediane(landsbergI))
-                    feat.setAttribute( 36, self.moyenne(landsbergI))
-                    feat.setAttribute( 37, self.ecart_type(landsbergI))
-                    
+                    feat.setAttribute( 18, sum(densityI)/areaI)
+                    feat.setAttribute( 19, median(distToRoadsI))
+                    feat.setAttribute( 20, mean(distToRoadsI))
+                    feat.setAttribute( 21, standard_deviation(distToRoadsI))
+                    feat.setAttribute( 22, deciles_as_str(distToRoadsI))
+                    feat.setAttribute( 23, sum(dens_vegetaleI) / areaI)
+                    feat.setAttribute( 24, median(complexitiesI))
+                    feat.setAttribute( 25, mean(complexitiesI))
+                    feat.setAttribute( 26, standard_deviation(complexitiesI))
+                    feat.setAttribute( 27, deciles_as_str(complexitiesI))
+                    feat.setAttribute( 28, median(formFactorsI))
+                    feat.setAttribute( 29, mean(formFactorsI))
+                    feat.setAttribute( 30, standard_deviation(formFactorsI))
+                    feat.setAttribute( 31, deciles_as_str(formFactorsI))
+                    feat.setAttribute( 32, median(formIndicesI))
+                    feat.setAttribute( 33, mean(formIndicesI))
+                    feat.setAttribute( 34, standard_deviation(formIndicesI))
+                    feat.setAttribute( 35, median(landsbergI))
+                    feat.setAttribute( 36, mean(landsbergI))
+                    feat.setAttribute( 37, standard_deviation(landsbergI))
 
                 featureListBis.append(feat)
 
-            
-
             prBis.addFeatures( featureListBis ) 
             irisBis.commitChanges()
-
 
             #Calcul de l'indicateur demande uniquement
             
@@ -1005,8 +587,8 @@ class IndicateursMorpho:
                 res = []
                 for f in layer_bati.getFeatures():
                     geom = f.geometry()
-                    smbr = self.compute_SMBR(geom)
-                    res.append(self.compute_convexity2(geom.area(),smbr[1]))
+                    smbr = compute_SMBR(geom)
+                    res.append(compute_convexity2(geom.area(),smbr[1]))
                     i = i + 1
                     progress.setValue(i)
                 ind = "convexity depending on SMBR" """
