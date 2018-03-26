@@ -30,7 +30,6 @@ from .IndicMorph_dialog import IndicateursMorphoDialog
 from .AttributeChooser_dialog import AttributeChooser
 import os.path
 from qgis.core import *
-from qgis.core import *
 from qgis.gui import *
 from .morpho import *
 from statistics import *
