@@ -99,12 +99,15 @@ def find(geom, index, dictionary, idAttribute):
     return max(intersections, key=lambda x: x[1])[0]
 
 def distance_from_polygon_to_layer(geom, index, dictionary, layer_id):
+    #Centroid of input buildings
     point = geom.pointOnSurface().asPoint()
+    #Cprint(point.asWkt())   
     distance = dictionary[index.nearestNeighbor(point,1)[0]].geometry().distance(geom)
-    #    print(point.wellKnownText())
-    #    print(distance)
-    bbox = geom.buffer(distance+1,3).boundingBox()
-    #    print(bbox.asWktPolygon())
+
+    #Cprint(distance)
+    bbox = geom.buffer(distance*1.5,3).boundingBox()
+    #Cprint(bbox.asWktPolygon())
+    
     return min(
         ((f.geometry().distance(geom), f.attribute(layer_id))
          for f in map(lambda id: dictionary[id], index.intersects(bbox))),
@@ -231,7 +234,7 @@ def compute_landsberg(rue, sIndex_bati, features_bati, nom_hauteur):
     buffers_rue = [b_rue,b_rue2]
     gdbuff_rue = b_rue.combine(b_rue2)
     batis_id = sIndex_bati.intersects(gdbuff_rue.boundingBox())
-    print(batis_id)
+    #print(batis_id)
     batis_id_2c = [[],[]]
     for bati_id in batis_id:
         if features_bati[bati_id].geometry().intersects(b_rue):
@@ -248,7 +251,7 @@ def compute_landsberg(rue, sIndex_bati, features_bati, nom_hauteur):
             init = False
             intervalles = []
             for point in voisin.geometry().asPolygon()[0]:
-                x = rue.geometry().lineLocatePoint(QgsGeometry.fromPoint(point))
+                x = rue.geometry().lineLocatePoint(QgsGeometry.fromPointXY(point))
                 if not init:
                     mini = x
                     maxi = x

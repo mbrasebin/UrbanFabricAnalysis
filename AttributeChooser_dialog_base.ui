@@ -29,7 +29,7 @@
     <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
    </property>
   </widget>
-  <widget class="QComboBox" name="bati">
+  <widget class="QComboBox" name="dropdownIDBuilding">
    <property name="geometry">
     <rect>
      <x>20</x>
@@ -44,15 +44,15 @@
     <rect>
      <x>20</x>
      <y>10</y>
-     <width>121</width>
+     <width>151</width>
      <height>16</height>
     </rect>
    </property>
    <property name="text">
-    <string>Couche bâtie</string>
+    <string>ID bâtiment</string>
    </property>
   </widget>
-  <widget class="QComboBox" name="routes">
+  <widget class="QComboBox" name="dropDownBuildingHeight">
    <property name="geometry">
     <rect>
      <x>20</x>
@@ -72,30 +72,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Couche de routes</string>
-   </property>
-  </widget>
-  <widget class="QComboBox" name="iris">
-   <property name="geometry">
-    <rect>
-     <x>20</x>
-     <y>180</y>
-     <width>221</width>
-     <height>22</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_4">
-   <property name="geometry">
-    <rect>
-     <x>20</x>
-     <y>160</y>
-     <width>171</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Niveau d'agregation</string>
+    <string>Hauteur bâtiment</string>
    </property>
   </widget>
   <widget class="QLabel" name="label_6">
@@ -108,14 +85,37 @@
     </rect>
    </property>
    <property name="text">
-    <string>Couche de végétation</string>
+    <string>ID IRIS</string>
    </property>
   </widget>
-  <widget class="QComboBox" name="vegetation">
+  <widget class="QComboBox" name="dropDownIDIris">
    <property name="geometry">
     <rect>
      <x>20</x>
      <y>130</y>
+     <width>221</width>
+     <height>22</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_7">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>160</y>
+     <width>141</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>ID Route</string>
+   </property>
+  </widget>
+  <widget class="QComboBox" name="dropDownIDRoads">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>180</y>
      <width>221</width>
      <height>22</height>
     </rect>

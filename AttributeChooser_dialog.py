@@ -26,13 +26,13 @@ from PyQt5 import  uic
 from PyQt5.QtWidgets import QDialog
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
-    os.path.dirname(__file__), 'IndicMorph_dialog_base.ui'))
+    os.path.dirname(__file__), 'AttributeChooser_dialog_base.ui'))
 
 
-class IndicateursMorphoDialog(QDialog, FORM_CLASS):
+class AttributeChooser(QDialog, FORM_CLASS):
     def __init__(self, parent=None):
         """Constructor."""
-        super(IndicateursMorphoDialog, self).__init__(parent)
+        super(AttributeChooser, self).__init__(parent)
         # Set up the user interface from Designer.
         # After setupUI you can access any designer object by doing
         # self.<objectname>, and you can use autoconnect slots - see
