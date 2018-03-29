@@ -394,7 +394,6 @@ class IndicateursMorpho:
                     area = geom.area()
                     perimeter = geom.length()
                     hauteur = f.attribute(height_name)
-                    #99
                     ident = f.attribute(building_id_name)
     
                     #recherche de l'IRIS du batiment
